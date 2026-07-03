@@ -1,0 +1,60 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dependencies and build outputs
+node_modules/
+vendor/
+dist/
+build/
+coverage/
+.next/
+.nuxt/
+
+# PHP / Composer
+composer.phar
+
+# Mobile build outputs
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/.symlinks/
+
+# Docker and local runtime data
+docker/.data/
+docker/data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Codebase memory artifacts
+.codebase-memory/
