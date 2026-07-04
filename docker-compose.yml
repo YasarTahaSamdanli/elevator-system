@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    working_dir: /var/www/backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/var/www/backend
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -lc "composer install --no-interaction --prefer-dist
+      && php artisan serve --host=0.0.0.0 --port=8000"
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-asansor}
+      POSTGRES_USER: ${DB_USERNAME:-asansor}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-asansor}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:

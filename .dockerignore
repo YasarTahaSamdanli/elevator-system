@@ -1,0 +1,16 @@
+.git
+.codebase-memory
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/node_modules
+backend/vendor
+backend/bootstrap/cache/*.php
+backend/storage/framework/cache/data
+backend/storage/framework/sessions
+backend/storage/framework/testing
+backend/storage/framework/views
+backend/storage/logs
+backend/storage/*.key
+docker/.data
+docker/data
