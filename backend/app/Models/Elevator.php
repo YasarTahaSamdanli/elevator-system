@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
-use Database\Factories\CompanyFactory;
+use Database\Factories\ElevatorFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Company extends Model
+class Elevator extends Model
 {
-    /** @use HasFactory<CompanyFactory> */
+    /** @use HasFactory<ElevatorFactory> */
     use HasFactory;
 
     use HasUuids;
@@ -23,14 +24,18 @@ class Company extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'building_id',
+        'serial_number',
         'name',
-        'tax_number',
-        'phone',
-        'email',
-        'address',
-        'city',
-        'district',
-        'is_active',
+        'manufacturer',
+        'model',
+        'installation_year',
+        'capacity_kg',
+        'person_capacity',
+        'stop_count',
+        'registration_number',
+        'status',
+        'notes',
     ];
 
     /**
@@ -40,12 +45,17 @@ class Company extends Model
      */
     public function uniqueIds(): array
     {
-        return ['uuid'];
+        return ['uuid', 'qr_identifier'];
     }
 
-    public function buildings(): HasMany
+    public function building(): BelongsTo
     {
-        return $this->hasMany(Building::class);
+        return $this->belongsTo(Building::class);
+    }
+
+    public function serviceContracts(): HasMany
+    {
+        return $this->hasMany(ServiceContract::class);
     }
 
     /**
@@ -56,7 +66,10 @@ class Company extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
+            'installation_year' => 'integer',
+            'capacity_kg' => 'integer',
+            'person_capacity' => 'integer',
+            'stop_count' => 'integer',
         ];
     }
 }

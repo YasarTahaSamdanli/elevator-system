@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
-use Database\Factories\CompanyFactory;
+use Database\Factories\BuildingFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Company extends Model
+class Building extends Model
 {
-    /** @use HasFactory<CompanyFactory> */
+    /** @use HasFactory<BuildingFactory> */
     use HasFactory;
 
     use HasUuids;
@@ -23,14 +24,18 @@ class Company extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'company_id',
         'name',
-        'tax_number',
-        'phone',
-        'email',
+        'code',
         'address',
         'city',
         'district',
+        'manager_name',
+        'manager_phone',
+        'latitude',
+        'longitude',
         'is_active',
+        'notes',
     ];
 
     /**
@@ -43,9 +48,14 @@ class Company extends Model
         return ['uuid'];
     }
 
-    public function buildings(): HasMany
+    public function company(): BelongsTo
     {
-        return $this->hasMany(Building::class);
+        return $this->belongsTo(Company::class);
+    }
+
+    public function elevators(): HasMany
+    {
+        return $this->hasMany(Elevator::class);
     }
 
     /**
@@ -56,6 +66,8 @@ class Company extends Model
     protected function casts(): array
     {
         return [
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
             'is_active' => 'boolean',
         ];
     }
