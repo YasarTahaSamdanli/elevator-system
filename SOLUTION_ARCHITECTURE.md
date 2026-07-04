@@ -1,16 +1,16 @@
 # Asansör Bakım ve Servis Yönetim Sistemi - Solution Architecture
 
-Bu doküman, ticari olarak geliştirilecek Asansör Bakım ve Servis Yönetim Sistemi için resmi mimari referans belgesidir. Amaç; ürünün uzun yıllar büyüyebileceği, farklı müşteri segmentlerine hizmet verebileceği, bakımı kolay, güvenli ve ölçeklenebilir bir SaaS mimarisi tanımlamaktır.
+Bu doküman, ilk sürümde tek bir asansör bakım firması için geliştirilecek Asansör Bakım ve Servis Yönetim Sistemi için resmi mimari referans belgesidir. Amaç; kurum içi operasyonları güvenilir biçimde yöneten, bakımı kolay, güvenli, ölçeklenebilir ve ileride çoklu firma desteğine genişletilebilecek bir mimari tanımlamaktır.
 
 Bu belge herhangi bir framework kurulumu, uygulama kodu, migration veya veritabanı şeması içermez. Teknoloji kararları bu dokümanda resmi mimari karar olarak tanımlanmış, önemli gerekçeler ADR mantığıyla kayıt altına alınmıştır.
 
 ## 1. Proje Vizyonu
 
-Projenin vizyonu; asansör bakım firmalarının sözleşme, periyodik bakım, arıza, saha operasyonu, müşteri iletişimi, raporlama ve finansal takip süreçlerini tek merkezden yönetebileceği profesyonel bir SaaS platformu oluşturmaktır.
+Projenin vizyonu; ilk sürümde tek bir asansör bakım firmasının sözleşme, periyodik bakım, arıza, saha operasyonu, müşteri iletişimi, raporlama ve temel ticari takip süreçlerini tek merkezden yönetebileceği profesyonel bir kurumsal yazılım oluşturmaktır.
 
 Sistem yalnızca kayıt tutan bir uygulama değil, operasyonel kararları destekleyen bir yönetim platformu olmalıdır. Bakım planlarının aksamasını önlemek, arıza müdahale sürelerini düşürmek, saha ekiplerinin iş yükünü görünür kılmak ve yönetime ticari analiz sağlayacak raporlar üretmek temel değer önerileridir.
 
-Ürün, küçük bakım firmalarından çok şubeli kurumsal yapılara kadar farklı ölçeklerde kullanılabilecek şekilde tasarlanmalıdır. Bu nedenle mimari; modülerlik, tenant izolasyonu, yetkilendirme esnekliği, denetlenebilirlik ve ileride eklenecek modüllere açıklık üzerine kurulmalıdır.
+Ürün, ilk aşamada tek firma operasyonuna odaklanmalıdır. Ancak mimari; modülerlik, Company (Firma) bazlı veri sahipliği, yetkilendirme esnekliği, denetlenebilirlik ve ileride çoklu firma ya da SaaS modeline genişleyebilme ihtimali üzerine korunmalıdır.
 
 ## 2. Hedefler
 
@@ -20,7 +20,7 @@ Başlıca ürün hedefleri şunlardır:
 - Periyodik bakım planlarını otomatik takip edilebilir hale getirmek.
 - Arıza, servis ve bakım iş emirlerini saha ekiplerine atanabilir ve izlenebilir yapmak.
 - Yönetici, müşteri ve saha personeli için farklı kullanıcı deneyimleri sunmak.
-- Ticari SaaS modeline uygun çok müşterili, güvenli ve ölçeklenebilir altyapı kurmak.
+- Tek firma kullanımını sade ve güvenilir tutarken, gelecekte çoklu firma desteğine genişleyebilecek bir altyapı kurmak.
 - Kurumsal müşteriler için raporlama, audit ve veri dışa aktarma ihtiyaçlarını desteklemek.
 - İleride mobil uygulama, entegrasyon, bildirim ve gelişmiş analiz modüllerini sorunsuz ekleyebilecek bir temel oluşturmak.
 
@@ -36,8 +36,8 @@ Teknik hedefler:
 
 Sistem, farklı sorumluluk seviyelerine sahip kullanıcıları destekleyecek şekilde tasarlanmalıdır.
 
-- **Platform Super Admin**: SaaS platformunun tamamını yönetir. Tenant açma, plan yönetimi, sistem geneli ayarlar ve operasyonel destek işlemlerinden sorumludur.
-- **Tenant Owner**: Bakım firmasının ana hesabını yönetir. Firma bilgileri, lisans kapsamı, kullanıcılar ve temel ayarlardan sorumludur.
+- **Sistem Yöneticisi**: İlk sürümde kurulum, sistem geneli teknik ayarlar ve operasyonel destek işlemlerinden sorumludur. Gelecekte çoklu firma desteği geldiğinde platform seviyesinde yönetim rolüne genişleyebilir.
+- **Firma Sahibi**: Bakım firmasının ana hesabını yönetir. Firma bilgileri, kullanıcılar ve temel ayarlardan sorumludur.
 - **Firma Yöneticisi**: Operasyonel süreçleri takip eder. Bakım planları, arıza kayıtları, ekip performansı, müşteri ilişkileri ve raporlamayı yönetir.
 - **Operasyon Sorumlusu / Dispeçer**: Gelen talepleri iş emrine dönüştürür, saha ekiplerine atama yapar, iş emri durumlarını takip eder.
 - **Teknisyen / Saha Personeli**: Kendisine atanan bakım ve servis işlerini görüntüler, işlem adımlarını tamamlar, fotoğraf veya belge ekler, servis sonucunu raporlar.
@@ -51,7 +51,7 @@ Roller sabit bir liste olarak değil, ileride role-based access control ve permi
 
 İlk mimari kapsam aşağıdaki modüler yapıyı hedefler:
 
-- **Tenant ve Abonelik Yönetimi**: SaaS müşterilerinin, planlarının, limitlerinin ve kullanım durumlarının yönetimi.
+- **Company (Firma) Yönetimi**: Bakım firmasının temel bilgileri, kullanıcıları, ayarları ve operasyonel tercihleri.
 - **Kullanıcı ve Yetki Yönetimi**: Kullanıcı hesapları, roller, izinler, davetler ve oturum yönetimi.
 - **Müşteri Yönetimi**: Bakım firmasının hizmet verdiği kurum, site, bina veya bireysel müşterilerin yönetimi.
 - **Tesis ve Lokasyon Yönetimi**: Bina, blok, adres, coğrafi konum ve bağlantılı varlıkların modellenmesi.
@@ -73,7 +73,7 @@ Modüller başlangıçta tek monorepo içinde geliştirilebilir; ancak sınırla
 
 Domain modeli, iş süreçlerini teknik tablolardan önce iş kavramlarıyla ifade eder. Ana domain varlıkları şunlardır:
 
-- **Tenant**: SaaS platformunda hizmet alan bakım firması veya organizasyon.
+- **Company (Firma)**: İlk sürümde sistemi kullanan bakım firmasını temsil eder. Gelecekte çoklu firma desteğinde veri sahipliği ve izolasyon sınırının temelidir.
 - **User**: Sisteme giriş yapan gerçek kişi veya servis hesabı.
 - **Role / Permission**: Kullanıcının sistemde yapabileceği işlemleri belirleyen yetki modeli.
 - **Customer**: Bakım firmasının hizmet verdiği müşteri.
@@ -89,7 +89,7 @@ Domain modeli, iş süreçlerini teknik tablolardan önce iş kavramlarıyla ifa
 - **ChecklistItem**: ChecklistTemplate içindeki tekil kontrol maddesi. Kontrolün sırası, zorunluluğu, cevap tipi ve açıklama ihtiyacı gibi kuralları taşır.
 - **ChecklistAnswer**: Teknisyenin belirli bir iş emri kapsamında ChecklistItem için verdiği cevap. Sahada gerçekten yapılan kontrolün kanıtı olduğu için template maddesinden ayrı saklanır.
 - **ServiceReport**: Sahada yapılan işlemlerin sonucu, notları, fotoğrafları ve onay bilgileri.
-- **Attachment**: Sisteme yüklenen ve domain kayıtlarıyla ilişkilendirilen dosya üst kavramı. Tenant, dosya sahibi kayıt, erişim yetkisi, saklama anahtarı, MIME type ve audit bilgileri bu nesne üzerinden yönetilir.
+- **Attachment**: Sisteme yüklenen ve domain kayıtlarıyla ilişkilendirilen dosya üst kavramı. Company (Firma), dosya sahibi kayıt, erişim yetkisi, saklama anahtarı, MIME type ve audit bilgileri bu nesne üzerinden yönetilir.
 - **Photo**: Servis, arıza, bakım veya hasar durumunu görsel olarak kanıtlayan Attachment alt türü.
 - **Signature**: Müşteri onayı, teknisyen teslimi veya servis kapanışı gibi süreçlerde kullanılan imza dosyası.
 - **Document**: Sözleşme, yasal evrak, uygunluk belgesi veya müşteri tarafından paylaşılan doküman.
@@ -123,18 +123,18 @@ Bu aşamada hiçbir teknoloji kurulmayacaktır. Ancak ürünün resmi teknoloji 
 
 Nihai teknoloji yığını:
 
-- **Backend: Laravel 12**: SaaS ürün geliştirme hızını artıran olgun ekosistemi, yerleşik queue/scheduler yapısı, güçlü authentication/authorization seçenekleri, bakım kolaylığı ve Türkiye pazarındaki geliştirici bulunabilirliği nedeniyle seçilmiştir.
+- **Backend: Laravel 12**: Kurumsal operasyon yazılımı geliştirme hızını artıran olgun ekosistemi, yerleşik queue/scheduler yapısı, güçlü authentication/authorization seçenekleri, bakım kolaylığı ve Türkiye pazarındaki geliştirici bulunabilirliği nedeniyle seçilmiştir.
 - **PHP: 8.3+**: Laravel 12 ile uyumlu modern dil özellikleri, performans iyileştirmeleri, tip güvenliği kabiliyetleri ve uzun vadeli bakım avantajı nedeniyle kullanılacaktır.
-- **Web: React + TypeScript**: Operasyonel SaaS panelleri için zengin component ekosistemi, güçlü state yönetimi seçenekleri, TypeScript ile tip güvenliği ve büyük frontend kod tabanlarında sürdürülebilirlik sağlaması nedeniyle seçilmiştir.
+- **Web: React + TypeScript**: Veri yoğun operasyon panelleri için zengin component ekosistemi, güçlü state yönetimi seçenekleri, TypeScript ile tip güvenliği ve büyük frontend kod tabanlarında sürdürülebilirlik sağlaması nedeniyle seçilmiştir.
 - **Mobile: Flutter**: Tek kod tabanıyla Android ve iOS üretimi, saha operasyonları için tutarlı kullanıcı deneyimi, offline-first senaryolarda güçlü kontrol ve yüksek performanslı arayüz kabiliyeti nedeniyle seçilmiştir.
-- **Database: PostgreSQL**: İlişkisel veri bütünlüğü, transaction güvenilirliği, gelişmiş index seçenekleri, JSONB desteği, raporlama kabiliyeti ve SaaS sistemlerde kanıtlanmış olgunluğu nedeniyle seçilmiştir.
+- **Database: PostgreSQL**: İlişkisel veri bütünlüğü, transaction güvenilirliği, gelişmiş index seçenekleri, JSONB desteği, raporlama kabiliyeti ve kurumsal operasyon sistemlerinde kanıtlanmış olgunluğu nedeniyle seçilmiştir.
 - **Cache & Queue: Redis**: Cache, rate limiting, queue altyapısı ve kısa ömürlü operasyonel veriler için hızlı, sade ve Laravel ekosistemiyle uyumlu olması nedeniyle kullanılacaktır.
 - **Realtime: Laravel Reverb**: Laravel ekosistemiyle doğal entegrasyonu, websocket tabanlı gerçek zamanlı olay iletimi ve operasyon ekranlarında düşük gecikmeli güncelleme ihtiyacını karşılaması nedeniyle seçilmiştir.
 - **Container: Docker**: Local development, staging ve production ortamlarında tutarlı çalışma ortamı sağlamak, bağımlılık farklarını azaltmak ve deployment süreçlerini standartlaştırmak için kullanılacaktır.
 - **Object Storage: S3 uyumlu depolama**: Fotoğraf, imza, belge ve rapor dosyalarının uygulama sunucusundan bağımsız, ölçeklenebilir ve taşınabilir biçimde saklanması için kullanılacaktır.
 - **API: REST (v1)**: Web ve mobil istemciler için anlaşılır, yaygın, test edilebilir ve üçüncü taraf entegrasyonlara uygun bir sözleşme sunması nedeniyle ilk API standardı olarak belirlenmiştir.
 
-Teknoloji kararlarında temel kriterler; ürün geliştirme hızı, ekip bulunabilirliği, bakım maliyeti, güvenlik, ölçeklenebilirlik, test edilebilirlik, ekosistem olgunluğu ve ticari SaaS operasyonlarına uygunluktur.
+Teknoloji kararlarında temel kriterler; ürün geliştirme hızı, ekip bulunabilirliği, bakım maliyeti, güvenlik, ölçeklenebilirlik, test edilebilirlik, ekosistem olgunluğu ve kurumsal operasyon süreçlerine uygunluktur.
 
 ## 8. Monorepo Yapısı
 
@@ -193,14 +193,14 @@ Her ADR numaralı, kısa başlıklı ve durum bilgisi içeren bir doküman olara
 
 - **Durum**: Accepted
 - **Karar**: Backend Laravel 12 ve PHP 8.3+ ile geliştirilecektir.
-- **Gerekçe**: Laravel; hızlı SaaS geliştirme, olgun ekosistem, queue, scheduler, broadcasting, authentication, authorization ve test araçlarıyla ürünün ihtiyaçlarını tek çatı altında karşılar. Türkiye pazarında geliştirici bulunabilirliği yüksek olduğu için uzun vadeli bakım riskini azaltır.
+- **Gerekçe**: Laravel; hızlı kurumsal uygulama geliştirme, olgun ekosistem, queue, scheduler, broadcasting, authentication, authorization ve test araçlarıyla ürünün ihtiyaçlarını tek çatı altında karşılar. Türkiye pazarında geliştirici bulunabilirliği yüksek olduğu için uzun vadeli bakım riskini azaltır.
 - **Sonuç**: Backend modüler monolith olarak Laravel üzerinde inşa edilecek; iş mantığı Controller içinde değil Service / Action ve domain katmanlarında tutulacaktır.
 
 #### ADR-002 - Neden React?
 
 - **Durum**: Accepted
 - **Karar**: Web uygulaması React + TypeScript ile geliştirilecektir.
-- **Gerekçe**: React ekosistemi veri yoğun SaaS panelleri, component tabanlı ekranlar ve karmaşık kullanıcı etkileşimleri için güçlüdür. TypeScript, büyük web kod tabanlarında tip güvenliği ve refactor güvenilirliği sağlar.
+- **Gerekçe**: React ekosistemi veri yoğun operasyon panelleri, component tabanlı ekranlar ve karmaşık kullanıcı etkileşimleri için güçlüdür. TypeScript, büyük web kod tabanlarında tip güvenliği ve refactor güvenilirliği sağlar.
 - **Sonuç**: Web arayüzü domain odaklı component yapısıyla geliştirilecek; API iletişimi standart client katmanı üzerinden yürütülecektir.
 
 #### ADR-003 - Neden Flutter?
@@ -214,15 +214,15 @@ Her ADR numaralı, kısa başlıklı ve durum bilgisi içeren bir doküman olara
 
 - **Durum**: Accepted
 - **Karar**: Ana ilişkisel veritabanı PostgreSQL olacaktır.
-- **Gerekçe**: PostgreSQL; transaction güvenilirliği, güçlü constraint desteği, gelişmiş index seçenekleri, JSONB kabiliyeti ve raporlama ihtiyaçlarına uygunluğu nedeniyle ticari SaaS verisi için güvenilir temeldir.
-- **Sonuç**: Domain verileri PostgreSQL üzerinde tenant izolasyonu, foreign key, unique constraint ve audit ihtiyaçları dikkate alınarak tasarlanacaktır.
+- **Gerekçe**: PostgreSQL; transaction güvenilirliği, güçlü constraint desteği, gelişmiş index seçenekleri, JSONB kabiliyeti ve raporlama ihtiyaçlarına uygunluğu nedeniyle kurumsal operasyon verisi için güvenilir temeldir.
+- **Sonuç**: Domain verileri PostgreSQL üzerinde Company (Firma) bazlı veri sahipliği, foreign key, unique constraint ve audit ihtiyaçları dikkate alınarak tasarlanacaktır.
 
 #### ADR-005 - Neden Modüler Monolith?
 
 - **Durum**: Accepted
 - **Karar**: Sistem başlangıç ve ana ürün geliştirme aşamasında modüler monolith olarak tasarlanacaktır.
 - **Gerekçe**: Modüler monolith, erken aşamada mikroservis karmaşıklığını önlerken domain sınırlarının net çizilmesine izin verir. Tek deployment modeli operasyon maliyetini azaltır, ancak modül sınırları doğru kurulduğunda ileride servis ayrışmasına kapı açık kalır.
-- **Sonuç**: Modüller tenant, kullanıcı, müşteri, asansör, iş emri, bakım, dosya, bildirim ve audit gibi domain sınırlarına göre organize edilecek; çapraz bağımlılıklar kontrollü tutulacaktır.
+- **Sonuç**: Modüller Company (Firma), kullanıcı, müşteri, asansör, iş emri, bakım, dosya, bildirim ve audit gibi domain sınırlarına göre organize edilecek; çapraz bağımlılıklar kontrollü tutulacaktır.
 
 ## 9. Backend Mimarisi
 
@@ -241,7 +241,7 @@ Backend karar prensipleri:
 - Domain kuralları yalnızca UI veya controller seviyesinde bırakılmamalıdır.
 - Kritik işlemler transaction sınırlarıyla korunmalıdır.
 - Dış servis entegrasyonları adapter arkasında izole edilmelidir.
-- Tenant izolasyonu backend'in tüm veri erişim yollarında zorunlu bir kural olmalıdır.
+- Company (Firma) bazlı veri sahipliği backend'in tüm veri erişim yollarında korunmalıdır; çoklu firma desteği geldiğinde bu yapı merkezi izolasyon kuralına genişleyebilmelidir.
 - Background işler idempotent tasarlanmalı, tekrar çalıştırıldığında veri tutarlılığını bozmamalıdır.
 
 Backend, REST API v1 standardı ile ilerleyecektir. Realtime ihtiyaçlar Laravel Reverb ile, uzun süren işler Redis queue ile, periyodik işler Laravel scheduler ile yönetilecektir. Raporlama ve entegrasyon ihtiyaçları olgunlaştıkça ayrı endpoint grupları, queue eventleri ve domain eventleriyle genişletilecektir.
@@ -271,7 +271,7 @@ Web mimarisi karar prensipleri:
 - Formlar validasyon, hata gösterimi ve erişilebilirlik açısından standartlaştırılmalıdır.
 - Dashboard ekranlarında gerçek zamanlı güncellemeler opsiyonel, kritik iş akışlarında ise kontrollü kullanılmalıdır.
 
-Web uygulaması bir pazarlama sitesi değil, operasyonel SaaS paneli olarak tasarlanmalıdır. Bu nedenle bilgi yoğunluğu, filtreleme, hızlı işlem ve güvenilir geri bildirimler görsel gösterişten daha önceliklidir.
+Web uygulaması bir pazarlama sitesi değil, operasyonel yönetim paneli olarak tasarlanmalıdır. Bu nedenle bilgi yoğunluğu, filtreleme, hızlı işlem ve güvenilir geri bildirimler görsel gösterişten daha önceliklidir.
 
 ## 11. Mobil Mimari
 
@@ -337,7 +337,7 @@ Standart hata response formatı:
 }
 ```
 
-Validation hatalarında `details` alanı field bazlı hata listesini taşımalıdır. Yetkilendirme, tenant izolasyonu, bulunamayan kayıt ve business rule ihlali gibi hata türleri standart hata kodlarıyla ayrıştırılmalıdır.
+Validation hatalarında `details` alanı field bazlı hata listesini taşımalıdır. Yetkilendirme, Company (Firma) kapsamı, bulunamayan kayıt ve business rule ihlali gibi hata türleri standart hata kodlarıyla ayrıştırılmalıdır.
 
 Pagination standardı:
 
@@ -365,7 +365,7 @@ Filtreleme ve sıralama standardı:
 - Sıralama `sort=field` ve ters sıralama `sort=-field` formatıyla yapılmalıdır.
 - Birden fazla sıralama gerektiğinde virgül ayrımı kullanılmalıdır: `sort=-created_at,status`.
 - Arama için `search` parametresi kullanılmalı, hangi alanlarda arama yapılacağı endpoint sözleşmesinde belirtilmelidir.
-- Tenant kapsamı client'tan gelen filtreye bırakılmamalı, backend tarafından zorunlu olarak uygulanmalıdır.
+- Company (Firma) kapsamı client'tan gelen filtreye bırakılmamalı, backend tarafından zorunlu olarak uygulanmalıdır.
 
 API sözleşmeleri ileride OpenAPI/Swagger gibi makine tarafından okunabilir formatlarla dokümante edilmelidir. Public API ile internal API ayrımı baştan düşünülmeli, entegrasyon müşterilerine açılacak yüzey kontrollü tutulmalıdır.
 
@@ -375,7 +375,7 @@ Veritabanı PostgreSQL üzerinde tasarlanacaktır. Veri bütünlüğü, transact
 
 Prensipler:
 
-- Her ana tabloda tenant izolasyonunu destekleyen alanlar bulunmalıdır.
+- Her ana tabloda Company (Firma) bazlı veri sahipliğini veya bu sahipliğe giden ilişki zincirini destekleyen alanlar bulunmalıdır.
 - Kritik kayıtlar için oluşturulma, güncellenme ve silinme bilgileri tutulmalıdır.
 - Soft delete yalnızca iş gereksinimi olan varlıklarda kullanılmalıdır.
 - Finans, sözleşme ve servis raporu gibi kayıtlar için geçmişi bozacak güncellemeler kontrollü yapılmalıdır.
@@ -386,25 +386,25 @@ Prensipler:
 
 Bu aşamada migration oluşturulmayacaktır. Veritabanı modeli, gereksinimler netleştikçe ayrı tasarım dokümanları ve ADR kayıtlarıyla olgunlaştırılmalıdır.
 
-## 14. Multi-Tenant Yaklaşımı
+## 14. Company (Firma) ve Gelecekte Çoklu Firma Yaklaşımı
 
-Sistem ticari SaaS ürünü olarak tasarlandığı için multi-tenant mimari temel kararlardan biridir.
+İlk sürüm tek bir asansör bakım firması için geliştirilecektir. Bu nedenle V1'de abonelik, paket, firma limiti, plan özelliği veya SaaS onboarding akışı ürün kapsamına dahil değildir.
+
+Buna rağmen domain modelinde Company (Firma) kavramı korunmalıdır. Company, ilk sürümde sistemi kullanan bakım firmasının kurumsal kimliğini temsil eder; gelecekte çoklu firma desteği gerektiğinde veri sahipliği ve izolasyon sınırının temelini oluşturur.
 
 Başlangıç için önerilen yaklaşım:
 
-- Tek uygulama, ortak veritabanı, tenant bazlı veri ayrımı.
-- Her tenant için benzersiz tenant kimliği.
-- Tüm tenant'a ait domain kayıtlarında tenant kapsamının zorunlu olması.
-- Backend veri erişim katmanında tenant scope'un merkezi uygulanması.
-- Tenant limitleri, plan özellikleri ve kullanım metriklerinin ayrı yönetilmesi.
+- Tek uygulama, ortak veritabanı ve tek aktif bakım firması kullanımı.
+- Domain kayıtlarında Company (Firma) sahipliğini doğrudan veya ilişki zinciri üzerinden koruyan model.
+- Backend veri erişim katmanının ileride merkezi Company scope uygulayabilecek şekilde tasarlanması.
+- Firma ayarları, çalışma saatleri ve operasyonel tercihlerin Company altında tutulması.
+- Abonelik, paket, kullanım limiti, plan özelliği ve firma bazlı metrik yönetiminin gelecekte eklenebilir modüller olarak değerlendirilmesi.
 
-Bu yaklaşım düşük operasyon maliyeti, kolay onboarding ve daha hızlı ürün geliştirme sağlar. Ancak tenant izolasyonu yalnızca UI seviyesinde bırakılmamalıdır. Her sorgu, her job, her dosya erişimi ve her rapor tenant farkındalığıyla tasarlanmalıdır.
-
-Kurumsal müşteriler için ileride ayrı veritabanı, ayrı schema veya dedicated deployment seçenekleri ayrı ADR süreciyle karara bağlanacaktır. Bu karar müşteri segmenti, regülasyon ve operasyon maliyetleri netleştiğinde verilmelidir.
+Bu yaklaşım V1 için gereksiz SaaS karmaşıklığını önlerken mevcut domain modelini bozmaz. Çoklu firma ihtiyacı ortaya çıktığında Company bazlı izolasyon, ayrı veritabanı, ayrı schema, dedicated deployment veya abonelik yönetimi kararları ayrı ADR süreciyle ele alınacaktır.
 
 ## 15. Kimlik Doğrulama ve Yetkilendirme
 
-Kimlik doğrulama ve yetkilendirme mimarisi SaaS güvenliğinin merkezindedir.
+Kimlik doğrulama ve yetkilendirme mimarisi kurumsal veri güvenliğinin merkezindedir.
 
 Kimlik doğrulama prensipleri:
 
@@ -418,7 +418,7 @@ Yetkilendirme prensipleri:
 
 - Rol bazlı erişim kontrolü temel alınmalıdır.
 - Kritik işlemler permission bazlı ayrıntılandırılmalıdır.
-- Tenant sınırları yetkilendirme modelinin ayrılmaz parçası olmalıdır.
+- Company (Firma) sınırları yetkilendirme modelinin ayrılmaz parçası olmalıdır.
 - Müşteri kullanıcıları yalnızca kendi tesis ve kayıtlarına erişebilmelidir.
 - Teknisyen kullanıcıları yalnızca atanmış iş emirlerini ve gerekli minimum müşteri bilgisini görmelidir.
 
@@ -438,7 +438,7 @@ Potansiyel realtime olayları:
 - Kritik bakım gecikmesi oluştu.
 - Müşteri onayı bekleyen rapor oluştu.
 
-Realtime sistem tasarlanırken bağlantı yönetimi, tenant izolasyonu, yetki kontrolü, event replay ihtiyacı ve mobil bağlantı kopmaları dikkate alınmalıdır.
+Realtime sistem tasarlanırken bağlantı yönetimi, Company (Firma) kapsamı, yetki kontrolü, event replay ihtiyacı ve mobil bağlantı kopmaları dikkate alınmalıdır.
 
 ## 17. Dosya Yönetimi
 
@@ -448,7 +448,7 @@ Dosya yönetimi prensipleri:
 
 - Dosyalar uygulama sunucusunda kalıcı olarak saklanmamalı, S3 uyumlu object storage kullanılmalıdır.
 - Dosya metadata bilgileri veritabanında tutulmalıdır.
-- Her dosya tenant, ilgili domain varlığı ve erişim izniyle ilişkilendirilmelidir.
+- Her dosya Company (Firma), ilgili domain varlığı ve erişim izniyle ilişkilendirilmelidir.
 - Dosya isimleri kullanıcı girdisine doğrudan bağımlı olmamalı, güvenli benzersiz anahtarlarla saklanmalıdır.
 - Virüs tarama, MIME type kontrolü ve maksimum dosya boyutu sınırları değerlendirilmelidir.
 - İndirme linkleri süreli ve yetki kontrollü olmalıdır.
@@ -472,11 +472,11 @@ Bildirim kanalları:
 Bildirim prensipleri:
 
 - Bildirim gönderimi arka plan job olarak çalışmalıdır.
-- Kanal seçimi tenant ve kullanıcı tercihleriyle yönetilebilmelidir.
+- Kanal seçimi firma ve kullanıcı tercihleriyle yönetilebilmelidir.
 - Kritik bildirimler ile bilgilendirme bildirimleri ayrıştırılmalıdır.
 - Gönderim denemeleri, hata durumları ve teslim bilgileri loglanmalıdır.
 - Aynı olay için gereksiz tekrar bildirim gönderimini önleyen deduplication stratejisi olmalıdır.
-- Şablonlar çok dil ve tenant özelleştirmesine uygun tasarlanmalıdır.
+- Şablonlar çok dil ve firma özelleştirmesine uygun tasarlanmalıdır.
 
 Örnek bildirim olayları:
 
@@ -493,7 +493,7 @@ Loglama ve audit birbirinden ayrı ele alınmalıdır.
 
 **Operational logging**, sistemin teknik sağlığını izlemek için kullanılır. Hata kayıtları, performans metrikleri, job sonuçları ve entegrasyon hataları bu kapsamdadır.
 
-**Audit logging**, kullanıcıların yaptığı kritik iş işlemlerini denetlenebilir şekilde kaydeder. Kim, ne zaman, hangi tenant içinde, hangi kaydı, hangi değişiklikle etkiledi sorularına cevap vermelidir.
+**Audit logging**, kullanıcıların yaptığı kritik iş işlemlerini denetlenebilir şekilde kaydeder. Kim, ne zaman, hangi Company (Firma) kapsamında, hangi kaydı, hangi değişiklikle etkiledi sorularına cevap vermelidir.
 
 Audit kapsamına girmesi gereken örnek işlemler:
 
@@ -503,7 +503,7 @@ Audit kapsamına girmesi gereken örnek işlemler:
 - İş emri durumu değiştirme.
 - Servis raporu onaylama.
 - Dosya indirme veya kritik belge görüntüleme.
-- Tenant ayarlarını değiştirme.
+- Firma ayarlarını değiştirme.
 
 Log kayıtlarında hassas veri maskeleme uygulanmalıdır. Parola, token, kişisel veri veya finansal detayların düz loglara yazılması engellenmelidir.
 
@@ -518,12 +518,12 @@ Test türleri:
 - **Contract Test**: Backend ve frontend/mobile arasında API sözleşme uyumluluğu.
 - **End-to-End Test**: Kritik kullanıcı akışları; iş emri oluşturma, atama, tamamlama, raporlama.
 - **Mobile Sync Test**: Offline kayıt, tekrar deneme ve çakışma senaryoları.
-- **Security Test**: Yetki aşımı, tenant izolasyonu, rate limiting ve dosya erişimi.
+- **Security Test**: Yetki aşımı, Company (Firma) kapsamı, rate limiting ve dosya erişimi.
 - **Performance Test**: Büyük müşteri verisi, yoğun iş emri listeleri ve raporlama sorguları.
 
 Test öncelikleri:
 
-- Tenant izolasyonu hataları.
+- Company (Firma) kapsamı ve yetki sınırı hataları.
 - Yetki kontrolü hataları.
 - İş emri yaşam döngüsü.
 - Bakım planı üretimi ve gecikme hesaplama.
@@ -576,7 +576,7 @@ Kodlama standartları Laravel 12, PHP 8.3+, React + TypeScript ve Flutter ekosis
 - Hata yönetimi tutarlı yapılmalı, kullanıcıya teknik detay sızdırılmamalıdır.
 - Her modül kendi sorumluluğu içinde kalmalı, çapraz bağımlılıklar kontrollü olmalıdır.
 - Formatlama, lint ve statik analiz otomatik hale getirilmelidir.
-- Kod inceleme süreci güvenlik, tenant izolasyonu, test ve domain doğruluğu açısından yapılmalıdır.
+- Kod inceleme süreci güvenlik, Company (Firma) kapsamı, test ve domain doğruluğu açısından yapılmalıdır.
 - **SOLID** prensipleri özellikle application service, action, policy ve domain servislerinde uygulanmalıdır.
 - **Clean Architecture** yaklaşımıyla presentation, application, domain ve infrastructure sorumlulukları ayrıştırılmalıdır.
 - **Domain Driven Design (DDD)** prensipleri domain dili, aggregate sınırları, value object, domain event ve iş kuralı modellemesinde referans alınmalıdır.

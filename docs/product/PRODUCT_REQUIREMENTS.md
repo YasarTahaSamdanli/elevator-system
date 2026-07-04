@@ -6,7 +6,7 @@ Bu doküman, Asansör Bakım ve Servis Yönetim Sistemi ürününün ne yapacağ
 
 ## 1. Ürün Amacı
 
-Ürünün amacı, asansör bakım firmalarının tüm bakım, arıza, servis, müşteri, tesis, asansör, saha ekibi ve raporlama süreçlerini tek merkezden yönetmesini sağlamaktır.
+Ürünün amacı, ilk sürümde tek bir asansör bakım firmasının tüm bakım, arıza, servis, müşteri, tesis, asansör, saha ekibi ve raporlama süreçlerini tek merkezden yönetmesini sağlamaktır. Mimari, gelecekte birden fazla firma kullanımına genişletilebilecek şekilde korunmalıdır.
 
 Sistem; bakım takibini manuel defter, Excel, telefon görüşmesi ve dağınık mesajlaşma süreçlerinden çıkararak izlenebilir, ölçülebilir ve denetlenebilir hale getirmelidir. Kullanıcılar hangi asansörün ne zaman bakıma gireceğini, hangi iş emrinin kimde olduğunu, hangi arızanın beklediğini ve hangi müşterinin hangi hizmeti aldığını açıkça görebilmelidir.
 
@@ -36,8 +36,8 @@ Sistem; bakım takibini manuel defter, Excel, telefon görüşmesi ve dağınık
 
 Ürün rol bazlı çalışma mantığını desteklemelidir. Her kullanıcı yalnızca sorumluluğu ve yetkisi dahilindeki bilgileri görmelidir.
 
-- **Platform Yöneticisi**: SaaS platformundaki bakım firmalarını, planları ve sistem seviyesindeki ayarları yönetir.
-- **Firma Sahibi / Tenant Owner**: Kendi firmasının kullanıcılarını, müşterilerini, modül erişimlerini ve firma ayarlarını yönetir.
+- **Sistem Yöneticisi**: İlk sürümde kurulum, sistem seviyesi teknik ayarlar ve destek süreçlerini yönetir. Gelecekte çoklu firma desteği gelirse platform seviyesinde yönetim rolüne genişleyebilir.
+- **Firma Sahibi**: Kendi firmasının kullanıcılarını, müşterilerini, modül erişimlerini ve firma ayarlarını yönetir.
 - **Firma Yöneticisi**: Tüm operasyonu izler, raporları görüntüler, ekiplerin iş yükünü takip eder.
 - **Operasyon Sorumlusu**: Servis taleplerini değerlendirir, bakım planlarını takip eder, iş emirlerini oluşturur ve atar.
 - **Teknisyen**: Kendisine atanmış işleri görür, QR kod okutur, checklist doldurur, fotoğraf/imza ekler ve işi tamamlar.
@@ -82,7 +82,7 @@ Sistem; bakım takibini manuel defter, Excel, telefon görüşmesi ve dağınık
 
 V1 ürün kapsamı aşağıdaki modüllerden oluşur:
 
-- Tenant ve firma yönetimi.
+- Company (Firma) yönetimi.
 - Kullanıcı, rol ve yetki yönetimi.
 - Müşteri yönetimi.
 - Tesis, bina ve lokasyon yönetimi.
@@ -101,12 +101,12 @@ V1 ürün kapsamı aşağıdaki modüllerden oluşur:
 
 ## 6. Her Modülün Yapacağı İşler
 
-### Tenant ve Firma Yönetimi
+### Company (Firma) Yönetimi
 
 - Bakım firmasının temel bilgilerini tutar.
 - Firma kullanıcılarını ve yetki sınırlarını yönetir.
 - Firma ayarlarını, çalışma saatlerini ve operasyonel tercihleri saklar.
-- SaaS planı, kullanım limiti ve aktif/pasif durum bilgisini izler.
+- V1'de abonelik, paket, kullanım limiti veya plan yönetimi içermez; bu bilgiler gelecekte çoklu firma ya da SaaS modeli gerektiğinde ayrı modül olarak değerlendirilebilir.
 
 ### Kullanıcı, Rol ve Yetki Yönetimi
 
@@ -366,11 +366,11 @@ Performans gereksinimleri kullanıcı deneyimi üzerinden ölçülmelidir: tekni
 
 ## 15. Güvenlik Gereksinimleri
 
-Sistem çok müşterili bir SaaS ürünü olduğu için güvenlik temel gereksinimdir.
+Sistem ilk sürümde tek bir bakım firması tarafından kullanılacak olsa da güvenlik temel gereksinimdir. Firma içi rol sınırları, müşteri yetkilisi erişimi ve gelecekte çoklu firma desteğine genişleyebilecek veri ayrımı baştan korunmalıdır.
 
 Güvenlik gereksinimleri:
 
-- Her firma yalnızca kendi verilerine erişebilmelidir.
+- Company (Firma) kapsamı korunmalı; gelecekte çoklu firma desteği geldiğinde her firma yalnızca kendi verilerine erişebilmelidir.
 - Müşteri yetkilisi yalnızca kendi tesislerini ve raporlarını görebilmelidir.
 - Teknisyen yalnızca kendisine atanmış işler ve gerekli minimum müşteri bilgisine erişebilmelidir.
 - Rol ve izinler açık şekilde yönetilebilmelidir.
@@ -381,7 +381,7 @@ Güvenlik gereksinimleri:
 - Silme, iptal, rol değiştirme ve sözleşme güncelleme gibi kritik işlemler denetlenebilir olmalıdır.
 - Mobil cihazda saklanan veriler minimumda tutulmalıdır.
 
-Güvenlik kullanıcı açısından güven ve sınır anlamına gelir: firma sahibi kendi verisinin başka müşterilerle karışmayacağından emin olmalı, müşteri yalnızca kendi tesislerini görmeli, teknisyen ise sadece işini yapacak kadar bilgiye erişmelidir.
+Güvenlik kullanıcı açısından güven ve sınır anlamına gelir: firma sahibi kurumsal verinin yetkisiz kişilerle karışmayacağından emin olmalı, müşteri yalnızca kendi tesislerini görmeli, teknisyen ise sadece işini yapacak kadar bilgiye erişmelidir.
 
 ## 16. V1 Kapsamında Olacak Özellikler
 
@@ -434,6 +434,7 @@ Sonraki sürümlere bırakılacak özellikler:
 - Otomatik rapor gönderimi.
 - WhatsApp ve gelişmiş mesajlaşma entegrasyonları.
 - Kurumsal ERP entegrasyonları.
-- Dedicated tenant veya özel kurulum seçenekleri.
+- Çoklu firma desteği, abonelik/paket yönetimi, firma kullanım limitleri ve SaaS operasyon kabiliyetleri.
+- Dedicated firma kurulumu veya özel deployment seçenekleri.
 
 Bu özellikler ürünün büyüme yol haritasında değerlendirilecektir. Öncelik, V1'de bakım firmalarının günlük operasyonunu gerçekten çalışır ve güvenilir şekilde yönetebilmesidir.
