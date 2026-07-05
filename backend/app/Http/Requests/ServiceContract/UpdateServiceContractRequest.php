@@ -2,10 +2,7 @@
 
 namespace App\Http\Requests\ServiceContract;
 
-use App\Support\ApiResponse;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
@@ -35,15 +32,5 @@ class UpdateServiceContractRequest extends FormRequest
             'monthly_fee' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'notes' => ['sometimes', 'nullable', 'string'],
         ];
-    }
-
-    protected function failedValidation(Validator $validator): void
-    {
-        throw new HttpResponseException(ApiResponse::error(
-            message: 'Validation failed.',
-            code: 'VALIDATION_ERROR',
-            details: $validator->errors()->toArray(),
-            status: 422,
-        ));
     }
 }

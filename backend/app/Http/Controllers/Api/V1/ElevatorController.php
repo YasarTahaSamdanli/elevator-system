@@ -9,17 +9,30 @@ use App\Http\Resources\ElevatorResource;
 use App\Models\Building;
 use App\Models\Elevator;
 use App\Support\ApiResponse;
+use App\Support\ListQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ElevatorController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $elevators = Elevator::query()->with('building')->latest()->get();
+        $elevators = ListQuery::for(Elevator::query()->with('building'), $request)
+            ->filterable([
+                'status',
+                'manufacturer',
+                'building_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
+                    'building',
+                    fn (Builder $building) => $building->where('uuid', $value),
+                ),
+            ])
+            ->searchable(['serial_number', 'qr_identifier', 'name', 'manufacturer', 'model'])
+            ->sortable(['serial_number', 'name', 'manufacturer', 'status', 'installation_year', 'created_at', 'updated_at'])
+            ->dateRange('created_at')
+            ->paginate();
 
-        return ApiResponse::success(
-            data: ElevatorResource::collection($elevators),
-        );
+        return ApiResponse::paginated($elevators, ElevatorResource::class);
     }
 
     public function show(Elevator $elevator): JsonResponse

@@ -8,17 +8,22 @@ use App\Http\Requests\Building\UpdateBuildingRequest;
 use App\Http\Resources\BuildingResource;
 use App\Models\Building;
 use App\Support\ApiResponse;
+use App\Support\ListQuery;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BuildingController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $buildings = Building::query()->latest()->get();
+        $buildings = ListQuery::for(Building::query(), $request)
+            ->filterable(['city', 'district', 'is_active'])
+            ->searchable(['name', 'code', 'city', 'district', 'manager_name'])
+            ->sortable(['name', 'code', 'city', 'district', 'created_at', 'updated_at'])
+            ->dateRange('created_at')
+            ->paginate();
 
-        return ApiResponse::success(
-            data: BuildingResource::collection($buildings),
-        );
+        return ApiResponse::paginated($buildings, BuildingResource::class);
     }
 
     public function show(Building $building): JsonResponse

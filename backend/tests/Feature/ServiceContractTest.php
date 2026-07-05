@@ -27,10 +27,11 @@ class ServiceContractTest extends TestCase
             'id' => $serviceContract->id,
             'elevator_id' => $elevator->id,
             'contract_number' => 'CNT-001',
-            'start_date' => '2026-01-01',
-            'end_date' => '2026-12-31',
             'status' => 'active',
         ]);
+
+        $this->assertSame('2026-01-01', $serviceContract->start_date->format('Y-m-d'));
+        $this->assertSame('2026-12-31', $serviceContract->end_date->format('Y-m-d'));
     }
 
     public function test_service_contract_uuid_is_generated_automatically(): void

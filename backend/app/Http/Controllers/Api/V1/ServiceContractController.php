@@ -9,17 +9,29 @@ use App\Http\Resources\ServiceContractResource;
 use App\Models\Elevator;
 use App\Models\ServiceContract;
 use App\Support\ApiResponse;
+use App\Support\ListQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ServiceContractController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $serviceContracts = ServiceContract::query()->with('elevator')->latest()->get();
+        $serviceContracts = ListQuery::for(ServiceContract::query()->with('elevator'), $request)
+            ->filterable([
+                'status',
+                'elevator_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
+                    'elevator',
+                    fn (Builder $elevator) => $elevator->where('uuid', $value),
+                ),
+            ])
+            ->searchable(['contract_number'])
+            ->sortable(['contract_number', 'start_date', 'end_date', 'monthly_fee', 'status', 'created_at', 'updated_at'])
+            ->dateRange('start_date', 'end_date', 'created_at')
+            ->paginate();
 
-        return ApiResponse::success(
-            data: ServiceContractResource::collection($serviceContracts),
-        );
+        return ApiResponse::paginated($serviceContracts, ServiceContractResource::class);
     }
 
     public function show(ServiceContract $serviceContract): JsonResponse

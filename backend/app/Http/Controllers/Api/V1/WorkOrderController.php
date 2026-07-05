@@ -10,17 +10,35 @@ use App\Models\ServiceContract;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Support\ApiResponse;
+use App\Support\ListQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class WorkOrderController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $workOrders = WorkOrder::query()->with(['serviceContract', 'assignedUser'])->latest()->get();
+        $workOrders = ListQuery::for(WorkOrder::query()->with(['serviceContract', 'assignedUser']), $request)
+            ->filterable([
+                'status',
+                'type',
+                'priority',
+                'assigned_user_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
+                    'assignedUser',
+                    fn (Builder $user) => $user->where('uuid', $value),
+                ),
+                'service_contract_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
+                    'serviceContract',
+                    fn (Builder $contract) => $contract->where('uuid', $value),
+                ),
+            ])
+            ->searchable(['work_order_number', 'description'])
+            ->sortable(['work_order_number', 'status', 'type', 'priority', 'scheduled_at', 'started_at', 'completed_at', 'created_at', 'updated_at'])
+            ->dateRange('scheduled_at', 'completed_at', 'created_at')
+            ->paginate();
 
-        return ApiResponse::success(
-            data: WorkOrderResource::collection($workOrders),
-        );
+        return ApiResponse::paginated($workOrders, WorkOrderResource::class);
     }
 
     public function show(WorkOrder $workOrder): JsonResponse
