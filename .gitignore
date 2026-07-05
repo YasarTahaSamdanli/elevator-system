@@ -27,6 +27,7 @@ pnpm-debug.log*
 
 # Dependencies and build outputs
 node_modules/
+*.tsbuildinfo
 vendor/
 dist/
 build/
