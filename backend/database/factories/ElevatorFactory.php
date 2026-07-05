@@ -33,4 +33,14 @@ class ElevatorFactory extends Factory
             'notes' => fake()->optional()->sentence(),
         ];
     }
+
+    /**
+     * @return $this
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Elevator $elevator): void {
+            $elevator->company_id ??= Building::find($elevator->building_id)?->company_id;
+        });
+    }
 }

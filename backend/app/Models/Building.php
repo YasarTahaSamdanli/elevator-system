@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\BuildingFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Building extends Model
 {
+    use BelongsToCompany;
+
     /** @use HasFactory<BuildingFactory> */
     use HasFactory;
 
@@ -21,10 +23,13 @@ class Building extends Model
     /**
      * The attributes that are mass assignable.
      *
+     * company_id is deliberately excluded: it is always derived from the
+     * authenticated user's company (see BelongsToCompany), never from
+     * client input.
+     *
      * @var list<string>
      */
     protected $fillable = [
-        'company_id',
         'name',
         'code',
         'address',
@@ -46,11 +51,6 @@ class Building extends Model
     public function uniqueIds(): array
     {
         return ['uuid'];
-    }
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
     }
 
     public function elevators(): HasMany

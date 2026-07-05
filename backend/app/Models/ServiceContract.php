@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\ServiceContractFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceContract extends Model
 {
+    use BelongsToCompany;
+
     /** @use HasFactory<ServiceContractFactory> */
     use HasFactory;
 
@@ -20,6 +23,9 @@ class ServiceContract extends Model
 
     /**
      * The attributes that are mass assignable.
+     *
+     * company_id is deliberately excluded: it is always derived from the
+     * owning elevator/authenticated user, never from client input.
      *
      * @var list<string>
      */

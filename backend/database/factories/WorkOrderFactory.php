@@ -31,4 +31,14 @@ class WorkOrderFactory extends Factory
             'notes' => fake()->optional()->sentence(),
         ];
     }
+
+    /**
+     * @return $this
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (WorkOrder $workOrder): void {
+            $workOrder->company_id ??= ServiceContract::find($workOrder->service_contract_id)?->company_id;
+        });
+    }
 }

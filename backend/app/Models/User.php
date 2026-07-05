@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -14,6 +14,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
+    use BelongsToCompany;
     use HasApiTokens;
 
     /** @use HasFactory<UserFactory> */
@@ -26,10 +27,12 @@ class User extends Authenticatable
     /**
      * The attributes that are mass assignable.
      *
+     * company_id is deliberately excluded: it is always derived from the
+     * inviting authenticated user's company, never from client input.
+     *
      * @var list<string>
      */
     protected $fillable = [
-        'company_id',
         'name',
         'email',
         'phone',
@@ -55,11 +58,6 @@ class User extends Authenticatable
     public function uniqueIds(): array
     {
         return ['uuid'];
-    }
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
     }
 
     /**

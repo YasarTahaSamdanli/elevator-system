@@ -30,4 +30,14 @@ class ServiceContractFactory extends Factory
             'notes' => fake()->optional()->sentence(),
         ];
     }
+
+    /**
+     * @return $this
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (ServiceContract $serviceContract): void {
+            $serviceContract->company_id ??= Elevator::find($serviceContract->elevator_id)?->company_id;
+        });
+    }
 }
