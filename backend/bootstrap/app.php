@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Every API error must follow the ApiResponse::error() contract:
@@ -75,7 +76,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 message: $message,
                 code: $code,
                 status: $status,
-            );
+            )->withHeaders($exception->getHeaders()); // keep Retry-After & X-RateLimit-*
         });
 
         $exceptions->render(function (Throwable $exception, Request $request) {
