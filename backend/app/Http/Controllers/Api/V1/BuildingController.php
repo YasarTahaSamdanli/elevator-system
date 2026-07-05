@@ -16,7 +16,7 @@ class BuildingController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $buildings = ListQuery::for(Building::query(), $request)
+        $buildings = ListQuery::for(Building::query()->withCount('elevators'), $request)
             ->filterable(['city', 'district', 'is_active'])
             ->searchable(['name', 'code', 'city', 'district', 'manager_name'])
             ->sortable(['name', 'code', 'city', 'district', 'created_at', 'updated_at'])
@@ -29,7 +29,7 @@ class BuildingController extends Controller
     public function show(Building $building): JsonResponse
     {
         return ApiResponse::success(
-            data: new BuildingResource($building),
+            data: new BuildingResource($building->loadCount('elevators')),
         );
     }
 

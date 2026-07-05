@@ -21,6 +21,15 @@ class WorkOrderResource extends JsonResource
                 'uuid' => $this->serviceContract?->uuid,
                 'contract_number' => $this->serviceContract?->contract_number,
             ],
+            'elevator' => [
+                'uuid' => $this->serviceContract?->elevator?->uuid,
+                'serial_number' => $this->serviceContract?->elevator?->serial_number,
+                'name' => $this->serviceContract?->elevator?->name,
+            ],
+            'building' => [
+                'uuid' => $this->serviceContract?->elevator?->building?->uuid,
+                'name' => $this->serviceContract?->elevator?->building?->name,
+            ],
             'assigned_user' => $this->when($this->assigned_user_id !== null, fn () => [
                 'uuid' => $this->assignedUser?->uuid,
                 'name' => $this->assignedUser?->name,

@@ -27,6 +27,7 @@ class BuildingResource extends JsonResource
             'longitude' => $this->longitude,
             'is_active' => $this->is_active,
             'notes' => $this->notes,
+            'elevator_count' => $this->whenCounted('elevators'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

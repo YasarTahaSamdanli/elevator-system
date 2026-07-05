@@ -18,7 +18,7 @@ class ServiceContractController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $serviceContracts = ListQuery::for(ServiceContract::query()->with('elevator'), $request)
+        $serviceContracts = ListQuery::for(ServiceContract::query()->with('elevator.building'), $request)
             ->filterable([
                 'status',
                 'elevator_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
@@ -37,7 +37,7 @@ class ServiceContractController extends Controller
     public function show(ServiceContract $serviceContract): JsonResponse
     {
         return ApiResponse::success(
-            data: new ServiceContractResource($serviceContract->load('elevator')),
+            data: new ServiceContractResource($serviceContract->load('elevator.building')),
         );
     }
 
@@ -51,7 +51,7 @@ class ServiceContractController extends Controller
         $serviceContract = ServiceContract::create($data);
 
         return ApiResponse::success(
-            data: new ServiceContractResource($serviceContract->load('elevator')),
+            data: new ServiceContractResource($serviceContract->load('elevator.building')),
             message: 'Service contract created successfully.',
             status: 201,
         );
@@ -70,7 +70,7 @@ class ServiceContractController extends Controller
         $serviceContract->update($data);
 
         return ApiResponse::success(
-            data: new ServiceContractResource($serviceContract->fresh()->load('elevator')),
+            data: new ServiceContractResource($serviceContract->fresh()->load('elevator.building')),
             message: 'Service contract updated successfully.',
         );
     }

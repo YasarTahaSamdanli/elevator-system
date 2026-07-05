@@ -19,6 +19,11 @@ class ServiceContractResource extends JsonResource
             'elevator' => [
                 'uuid' => $this->elevator?->uuid,
                 'serial_number' => $this->elevator?->serial_number,
+                'name' => $this->elevator?->name,
+                'building' => [
+                    'uuid' => $this->elevator?->building?->uuid,
+                    'name' => $this->elevator?->building?->name,
+                ],
             ],
             'contract_number' => $this->contract_number,
             'start_date' => $this->start_date,

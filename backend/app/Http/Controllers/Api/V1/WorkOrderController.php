@@ -19,7 +19,7 @@ class WorkOrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $workOrders = ListQuery::for(WorkOrder::query()->with(['serviceContract', 'assignedUser']), $request)
+        $workOrders = ListQuery::for(WorkOrder::query()->with(['serviceContract.elevator.building', 'assignedUser']), $request)
             ->filterable([
                 'status',
                 'type',
@@ -44,7 +44,7 @@ class WorkOrderController extends Controller
     public function show(WorkOrder $workOrder): JsonResponse
     {
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser'])),
         );
     }
 
@@ -64,7 +64,7 @@ class WorkOrderController extends Controller
         $workOrder = WorkOrder::create($data);
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser'])),
             message: 'Work order created successfully.',
             status: 201,
         );
@@ -88,7 +88,7 @@ class WorkOrderController extends Controller
         $workOrder->update($data);
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract.elevator.building', 'assignedUser'])),
             message: 'Work order updated successfully.',
         );
     }
