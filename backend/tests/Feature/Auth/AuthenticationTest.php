@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -12,6 +13,13 @@ use Tests\TestCase;
 class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+    }
 
     public function test_user_can_login_successfully(): void
     {
@@ -98,6 +106,122 @@ class AuthenticationTest extends TestCase
             ->assertJsonPath('error.code', 'INVALID_CREDENTIALS');
 
         $this->assertSame(0, PersonalAccessToken::query()->count());
+    }
+
+    public function test_login_is_rate_limited_after_too_many_failed_attempts(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'user@example.com',
+            'password' => 'secret-password',
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/v1/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ]);
+
+        $response
+            ->assertStatus(429)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error.code', 'TOO_MANY_ATTEMPTS')
+            ->assertJsonStructure([
+                'error' => ['details' => ['retry_after']],
+            ]);
+    }
+
+    public function test_rate_limit_blocks_correct_credentials_once_limit_is_reached(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'user@example.com',
+            'password' => 'secret-password',
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/v1/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ]);
+        }
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+        ]);
+
+        $response
+            ->assertStatus(429)
+            ->assertJsonPath('error.code', 'TOO_MANY_ATTEMPTS');
+        $this->assertSame(0, PersonalAccessToken::query()->count());
+    }
+
+    public function test_successful_login_resets_the_rate_limiter(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'user@example.com',
+            'password' => 'secret-password',
+        ]);
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->postJson('/api/v1/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+        ])->assertOk();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/v1/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ]);
+
+        $response->assertStatus(429);
+    }
+
+    public function test_rate_limit_is_scoped_per_email(): void
+    {
+        $blockedUser = User::factory()->create([
+            'email' => 'blocked@example.com',
+            'password' => 'secret-password',
+        ]);
+        $otherUser = User::factory()->create([
+            'email' => 'other@example.com',
+            'password' => 'secret-password',
+        ]);
+
+        for ($i = 0; $i < 6; $i++) {
+            $this->postJson('/api/v1/login', [
+                'email' => $blockedUser->email,
+                'password' => 'wrong-password',
+            ]);
+        }
+
+        $this->postJson('/api/v1/login', [
+            'email' => $blockedUser->email,
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+
+        $this->postJson('/api/v1/login', [
+            'email' => $otherUser->email,
+            'password' => 'secret-password',
+        ])->assertOk();
     }
 
     public function test_authenticated_user_can_logout(): void
