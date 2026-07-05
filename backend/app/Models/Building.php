@@ -53,6 +53,14 @@ class Building extends Model
         return ['uuid'];
     }
 
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function elevators(): HasMany
     {
         return $this->hasMany(Elevator::class);
