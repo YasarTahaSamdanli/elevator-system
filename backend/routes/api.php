@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BuildingController;
 use App\Http\Controllers\Api\V1\ElevatorController;
+use App\Http\Controllers\Api\V1\ServiceContractController;
+use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -14,5 +16,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::apiResource('buildings', BuildingController::class);
         Route::apiResource('elevators', ElevatorController::class);
+        Route::apiResource('service-contracts', ServiceContractController::class);
+        Route::apiResource('work-orders', WorkOrderController::class);
     });
 });

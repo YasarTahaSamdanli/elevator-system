@@ -49,6 +49,14 @@ class ServiceContract extends Model
         return ['uuid'];
     }
 
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function elevator(): BelongsTo
     {
         return $this->belongsTo(Elevator::class);

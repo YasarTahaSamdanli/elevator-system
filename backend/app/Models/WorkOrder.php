@@ -52,6 +52,14 @@ class WorkOrder extends Model
         return ['uuid'];
     }
 
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function serviceContract(): BelongsTo
     {
         return $this->belongsTo(ServiceContract::class);
