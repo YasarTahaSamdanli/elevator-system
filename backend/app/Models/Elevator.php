@@ -54,6 +54,14 @@ class Elevator extends Model
         return ['uuid', 'qr_identifier'];
     }
 
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function building(): BelongsTo
     {
         return $this->belongsTo(Building::class);
