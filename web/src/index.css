@@ -1,0 +1,171 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Asansör MS — Design Tokens
+   Neutral: Zinc (cool)  •  Accent: Endüstriyel Mavi (#2563EB)
+   Single accent, semantic status scale kept separate.
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Neutral surfaces */
+    --background: 240 6% 98%;
+    --foreground: 240 10% 12%;
+    --surface: 0 0% 100%;
+    --surface-foreground: 240 10% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 12%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 20%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 12%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 88%;
+    --ring: 221 83% 53%;
+
+    /* Brand accent — Endüstriyel Mavi */
+    --primary: 221 83% 53%;
+    --primary-hover: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Semantic status */
+    --success: 158 64% 38%;
+    --success-foreground: 158 68% 26%;
+    --success-subtle: 152 68% 95%;
+
+    --warning: 34 92% 46%;
+    --warning-foreground: 26 84% 34%;
+    --warning-subtle: 45 96% 94%;
+
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 70% 42%;
+    --danger-subtle: 0 86% 96%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 224 71% 45%;
+    --info-subtle: 214 96% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --radius: 0.625rem; /* 10px */
+
+    --shadow-xs: 0 1px 2px 0 hsl(240 8% 20% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(240 8% 20% / 0.06), 0 1px 2px -1px hsl(240 8% 20% / 0.05);
+    --shadow-md: 0 4px 12px -2px hsl(240 8% 20% / 0.08), 0 2px 6px -2px hsl(240 8% 20% / 0.05);
+    --shadow-lg: 0 12px 32px -6px hsl(240 12% 15% / 0.14), 0 6px 12px -6px hsl(240 12% 15% / 0.08);
+  }
+
+  .dark {
+    --background: 240 8% 6%;
+    --foreground: 0 0% 96%;
+    --surface: 240 7% 9%;
+    --surface-foreground: 0 0% 96%;
+    --card: 240 7% 9%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 7% 10%;
+    --popover-foreground: 0 0% 96%;
+
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 62%;
+    --secondary: 240 5% 15%;
+    --secondary-foreground: 0 0% 92%;
+    --accent: 240 5% 16%;
+    --accent-foreground: 0 0% 96%;
+
+    --border: 240 5% 17%;
+    --input: 240 5% 20%;
+    --ring: 217 91% 60%;
+
+    --primary: 217 91% 60%;
+    --primary-hover: 213 94% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --success: 158 58% 46%;
+    --success-foreground: 152 62% 64%;
+    --success-subtle: 158 42% 14%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 41 90% 66%;
+    --warning-subtle: 34 60% 15%;
+
+    --danger: 0 74% 60%;
+    --danger-foreground: 0 84% 72%;
+    --danger-subtle: 0 55% 16%;
+
+    --info: 217 91% 62%;
+    --info-foreground: 213 92% 72%;
+    --info-subtle: 221 60% 17%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.30);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.40), 0 1px 2px -1px hsl(0 0% 0% / 0.30);
+    --shadow-md: 0 4px 14px -2px hsl(0 0% 0% / 0.50), 0 2px 6px -2px hsl(0 0% 0% / 0.35);
+    --shadow-lg: 0 14px 36px -6px hsl(0 0% 0% / 0.60), 0 6px 14px -6px hsl(0 0% 0% / 0.45);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-feature-settings: "cv11", "ss01";
+    font-variation-settings: "opsz" 32;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Refined focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring/60 ring-offset-2 ring-offset-background;
+  }
+
+  /* Custom scrollbar — subtle, unobtrusive */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Faint grid texture for empty canvases / hero areas */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.6) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.6) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
