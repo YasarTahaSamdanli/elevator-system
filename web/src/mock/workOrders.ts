@@ -6,7 +6,7 @@ const tech = {
   emre: { id: "usr_3", name: "Emre Yıldız", avatar_url: null },
 };
 
-export const workOrders: WorkOrder[] = [
+const baseWorkOrders: Omit<WorkOrder, "notes">[] = [
   {
     id: "wo_1", service_contract_id: "ctr_2", work_order_number: "WO-20260705-A1B2C3D4",
     type: "fault", status: "in_progress", priority: "critical",
@@ -120,3 +120,5 @@ export const workOrders: WorkOrder[] = [
     description: "Arıza onarımı sonrası kontrol bakımı.",
   },
 ];
+
+export const workOrders: WorkOrder[] = baseWorkOrders.map((wo) => ({ ...wo, notes: null }));

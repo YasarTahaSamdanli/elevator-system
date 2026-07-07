@@ -4,6 +4,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  QrCode,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -20,5 +21,6 @@ export const navItems: NavItem[] = [
   { to: "/elevators", label: "Asansörler", icon: ArrowUpDown },
   { to: "/work-orders", label: "İş Emirleri", icon: ClipboardList },
   { to: "/contracts", label: "Sözleşmeler", icon: FileText },
+  { to: "/qr-labels", label: "QR Etiketleri", icon: QrCode },
   { to: "/team", label: "Ekip", icon: Users },
 ];

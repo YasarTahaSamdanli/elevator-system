@@ -126,6 +126,7 @@ export interface WorkOrder {
   elevator_name: string;
   building_name: string;
   description: string | null;
+  notes: string | null;
 }
 
 export interface AppNotification {

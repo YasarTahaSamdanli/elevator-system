@@ -99,6 +99,7 @@ interface WorkOrderPayload {
   started_at: string | null;
   completed_at: string | null;
   description: string | null;
+  notes: string | null;
 }
 
 interface UserPayload {
@@ -185,6 +186,7 @@ function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
     elevator_name: p.elevator.name ?? p.elevator.serial_number ?? "—",
     building_name: p.building.name ?? "—",
     description: p.description,
+    notes: p.notes,
   };
 }
 
@@ -241,11 +243,109 @@ export async function deleteBuilding(uuid: string): Promise<void> {
 export const fetchElevators = (params: ListParams = {}) =>
   fetchList<ElevatorPayload, Elevator>("/elevators", params, mapElevator);
 
+export interface ElevatorInput {
+  building_uuid: string;
+  serial_number: string;
+  name: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  installation_year: number | null;
+  capacity_kg: number | null;
+  person_capacity: number | null;
+  stop_count: number | null;
+  registration_number: string | null;
+  status: Elevator["status"];
+  notes: string | null;
+}
+
+export async function createElevator(input: ElevatorInput): Promise<Elevator> {
+  const { data } = await api<ElevatorPayload>("/elevators", {
+    method: "POST",
+    body: input,
+  });
+  return mapElevator(data);
+}
+
+export async function updateElevator(uuid: string, input: ElevatorInput): Promise<Elevator> {
+  const { data } = await api<ElevatorPayload>(`/elevators/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapElevator(data);
+}
+
+export async function deleteElevator(uuid: string): Promise<void> {
+  await api(`/elevators/${uuid}`, { method: "DELETE" });
+}
+
 export const fetchContracts = (params: ListParams = {}) =>
   fetchList<ContractPayload, ServiceContract>("/service-contracts", params, mapContract);
 
+export interface ContractInput {
+  elevator_uuid: string;
+  contract_number: string | null;
+  start_date: string;
+  end_date: string;
+  status: ServiceContract["status"];
+  monthly_fee: number | null;
+  notes: string | null;
+}
+
+export async function createContract(input: ContractInput): Promise<ServiceContract> {
+  const { data } = await api<ContractPayload>("/service-contracts", {
+    method: "POST",
+    body: input,
+  });
+  return mapContract(data);
+}
+
+export async function updateContract(uuid: string, input: ContractInput): Promise<ServiceContract> {
+  const { data } = await api<ContractPayload>(`/service-contracts/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapContract(data);
+}
+
+export async function deleteContract(uuid: string): Promise<void> {
+  await api(`/service-contracts/${uuid}`, { method: "DELETE" });
+}
+
 export const fetchWorkOrders = (params: ListParams = {}) =>
   fetchList<WorkOrderPayload, WorkOrder>("/work-orders", params, mapWorkOrder);
+
+export interface WorkOrderInput {
+  service_contract_uuid: string;
+  type: WorkOrder["type"];
+  status: WorkOrder["status"];
+  priority: WorkOrder["priority"];
+  scheduled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  assigned_user_uuid: string | null;
+  description: string | null;
+  notes: string | null;
+}
+
+export async function createWorkOrder(input: WorkOrderInput): Promise<WorkOrder> {
+  const { data } = await api<WorkOrderPayload>("/work-orders", {
+    method: "POST",
+    body: input,
+  });
+  return mapWorkOrder(data);
+}
+
+export async function updateWorkOrder(uuid: string, input: WorkOrderInput): Promise<WorkOrder> {
+  const { data } = await api<WorkOrderPayload>(`/work-orders/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapWorkOrder(data);
+}
+
+export async function deleteWorkOrder(uuid: string): Promise<void> {
+  await api(`/work-orders/${uuid}`, { method: "DELETE" });
+}
 
 export const fetchUsers = (params: ListParams = {}) =>
   fetchList<UserPayload, User>("/users", params, mapUser);

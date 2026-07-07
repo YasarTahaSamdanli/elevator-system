@@ -6,10 +6,13 @@ import {
   ClipboardCheck,
   ClipboardList,
   Hammer,
+  Loader2,
+  MoreHorizontal,
   Pencil,
   Play,
   Plus,
   Sparkles,
+  Trash2,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -25,6 +28,28 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -38,9 +63,20 @@ import {
 } from "@/lib/status";
 import { formatDateTime, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { fetchWorkOrders } from "@/api/resources";
+import {
+  createWorkOrder,
+  deleteWorkOrder,
+  fetchContracts,
+  fetchUsers,
+  fetchWorkOrders,
+  updateWorkOrder,
+  type WorkOrderInput,
+} from "@/api/resources";
 import { useDebounced, useList } from "@/hooks/useList";
+import { ApiError } from "@/lib/api";
 import type {
+  ServiceContract,
+  User,
   WorkOrder,
   WorkOrderPriority,
   WorkOrderStatus,
@@ -176,9 +212,13 @@ function TimelineItem({
 function WorkOrderSheet({
   workOrder,
   onClose,
+  onEdit,
+  onDelete,
 }: {
   workOrder: WorkOrder | null;
   onClose: () => void;
+  onEdit: (workOrder: WorkOrder) => void;
+  onDelete: (workOrder: WorkOrder) => void;
 }) {
   const TypeIcon = workOrder ? typeIcons[workOrder.type] : null;
 
@@ -262,13 +302,29 @@ function WorkOrderSheet({
                   />
                 </div>
               </section>
+
+              {workOrder.notes && (
+                <section className="space-y-2.5">
+                  <SectionLabel>Notlar</SectionLabel>
+                  <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm leading-6 text-foreground">
+                    {workOrder.notes}
+                  </p>
+                </section>
+              )}
             </div>
 
             <div className="flex gap-2 border-t border-border px-6 py-4">
-              <Button className="flex-1">Durumu Güncelle</Button>
-              <Button variant="outline" className="flex-1">
+              <Button className="flex-1" onClick={() => onEdit(workOrder)}>
                 <Pencil />
                 Düzenle
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 text-danger hover:text-danger"
+                onClick={() => onDelete(workOrder)}
+              >
+                <Trash2 />
+                Sil
               </Button>
             </div>
           </>
@@ -291,6 +347,333 @@ const priorityOptions = (Object.keys(workOrderPriorityMeta) as WorkOrderPriority
   label: workOrderPriorityMeta[p].label,
 }));
 
+const UNASSIGNED = "__unassigned__";
+
+interface WorkOrderFormValues {
+  service_contract_uuid: string;
+  type: WorkOrderType;
+  status: WorkOrderStatus;
+  priority: WorkOrderPriority;
+  assigned_user_uuid: string;
+  scheduled_at: string;
+  started_at: string;
+  completed_at: string;
+  description: string;
+  notes: string;
+}
+
+const emptyForm: WorkOrderFormValues = {
+  service_contract_uuid: "",
+  type: "maintenance",
+  status: "draft",
+  priority: "normal",
+  assigned_user_uuid: UNASSIGNED,
+  scheduled_at: "",
+  started_at: "",
+  completed_at: "",
+  description: "",
+  notes: "",
+};
+
+const blankToNull = (value: string): string | null => {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** ISO datetime (UTC) → local "YYYY-MM-DDTHH:mm" for datetime-local inputs. */
+function toLocalInput(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
+
+/** datetime-local value → ISO string (UTC), empty → null. */
+function fromLocalInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function formFromWorkOrder(workOrder: WorkOrder | null): WorkOrderFormValues {
+  if (!workOrder) return emptyForm;
+
+  return {
+    service_contract_uuid: workOrder.service_contract_id,
+    type: workOrder.type,
+    status: workOrder.status,
+    priority: workOrder.priority,
+    assigned_user_uuid: workOrder.assigned_user?.id ?? UNASSIGNED,
+    scheduled_at: toLocalInput(workOrder.scheduled_at),
+    started_at: toLocalInput(workOrder.started_at),
+    completed_at: toLocalInput(workOrder.completed_at),
+    description: workOrder.description ?? "",
+    notes: workOrder.notes ?? "",
+  };
+}
+
+function formToInput(values: WorkOrderFormValues): WorkOrderInput {
+  return {
+    service_contract_uuid: values.service_contract_uuid,
+    type: values.type,
+    status: values.status,
+    priority: values.priority,
+    assigned_user_uuid:
+      values.assigned_user_uuid === UNASSIGNED ? null : values.assigned_user_uuid,
+    scheduled_at: fromLocalInput(values.scheduled_at),
+    started_at: fromLocalInput(values.started_at),
+    completed_at: fromLocalInput(values.completed_at),
+    description: blankToNull(values.description),
+    notes: blankToNull(values.notes),
+  };
+}
+
+function contractLabel(contract: ServiceContract): string {
+  const number = contract.contract_number ?? "Sözleşme";
+  return `${number} — ${contract.building_name} / ${contract.elevator_name}`;
+}
+
+function fieldError(errors: Record<string, string[]>, field: keyof WorkOrderFormValues) {
+  return errors[field]?.[0] ?? null;
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="space-y-1.5 text-sm">
+      <span className="font-medium text-foreground">{label}</span>
+      {children}
+      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
+    </label>
+  );
+}
+
+function WorkOrderFormDialog({
+  open,
+  workOrder,
+  contracts,
+  users,
+  errors,
+  formError,
+  isSubmitting,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  workOrder: WorkOrder | null;
+  contracts: ServiceContract[];
+  users: User[];
+  errors: Record<string, string[]>;
+  formError: string | null;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: WorkOrderFormValues) => Promise<void>;
+}) {
+  const [values, setValues] = React.useState<WorkOrderFormValues>(() =>
+    formFromWorkOrder(workOrder)
+  );
+  const isEditing = !!workOrder;
+
+  React.useEffect(() => {
+    if (open) setValues(formFromWorkOrder(workOrder));
+  }, [workOrder, open]);
+
+  const setValue = (field: keyof WorkOrderFormValues, value: string) => {
+    setValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>{isEditing ? "İş Emrini Düzenle" : "Yeni İş Emri"}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? (
+              <>
+                İş emri no:{" "}
+                <span className="font-mono text-xs">{workOrder.work_order_number}</span>
+              </>
+            ) : (
+              "Sözleşme, iş türü ve planlama bilgilerini gir. İş emri numarası kayıt sırasında otomatik oluşturulur."
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          noValidate
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSubmit(values);
+          }}
+        >
+          {formError && (
+            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
+              {formError}
+            </div>
+          )}
+
+          <Field label="Sözleşme" error={fieldError(errors, "service_contract_uuid")}>
+            <Select
+              value={values.service_contract_uuid || undefined}
+              onValueChange={(value) => setValue("service_contract_uuid", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sözleşme seç" />
+              </SelectTrigger>
+              <SelectContent>
+                {contracts.map((contract) => (
+                  <SelectItem key={contract.id} value={contract.id}>
+                    {contractLabel(contract)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Tür" error={fieldError(errors, "type")}>
+              <Select value={values.type} onValueChange={(value) => setValue("type", value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Durum" error={fieldError(errors, "status")}>
+              <Select value={values.status} onValueChange={(value) => setValue("status", value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Öncelik" error={fieldError(errors, "priority")}>
+              <Select
+                value={values.priority}
+                onValueChange={(value) => setValue("priority", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <Field label="Teknisyen" error={fieldError(errors, "assigned_user_uuid")}>
+            <Select
+              value={values.assigned_user_uuid}
+              onValueChange={(value) => setValue("assigned_user_uuid", value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNASSIGNED}>Atanmadı</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Planlanan" error={fieldError(errors, "scheduled_at")}>
+              <Input
+                type="datetime-local"
+                value={values.scheduled_at}
+                onChange={(event) => setValue("scheduled_at", event.target.value)}
+              />
+            </Field>
+            <Field label="Başlama" error={fieldError(errors, "started_at")}>
+              <Input
+                type="datetime-local"
+                value={values.started_at}
+                onChange={(event) => setValue("started_at", event.target.value)}
+              />
+            </Field>
+            <Field label="Tamamlanma" error={fieldError(errors, "completed_at")}>
+              <Input
+                type="datetime-local"
+                value={values.completed_at}
+                onChange={(event) => setValue("completed_at", event.target.value)}
+              />
+            </Field>
+          </div>
+
+          <Field label="Açıklama" error={fieldError(errors, "description")}>
+            <textarea
+              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              value={values.description}
+              onChange={(event) => setValue("description", event.target.value)}
+              placeholder="Yapılacak işin detayları..."
+            />
+          </Field>
+
+          <Field label="Notlar" error={fieldError(errors, "notes")}>
+            <textarea
+              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              value={values.notes}
+              onChange={(event) => setValue("notes", event.target.value)}
+            />
+          </Field>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => onOpenChange(false)}
+            >
+              Vazgeç
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="animate-spin" />}
+              {isEditing ? "Kaydet" : "İş Emri Oluştur"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function WorkOrdersPage() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState(ALL_VALUE);
@@ -298,6 +681,13 @@ export function WorkOrdersPage() {
   const [priority, setPriority] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
   const [selected, setSelected] = React.useState<WorkOrder | null>(null);
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [editingWorkOrder, setEditingWorkOrder] = React.useState<WorkOrder | null>(null);
+  const [deletingWorkOrder, setDeletingWorkOrder] = React.useState<WorkOrder | null>(null);
+  const [formErrors, setFormErrors] = React.useState<Record<string, string[]>>({});
+  const [formError, setFormError] = React.useState<string | null>(null);
+  const [isSubmitting, setSubmitting] = React.useState(false);
+  const [isDeleting, setDeleting] = React.useState(false);
   const debouncedQuery = useDebounced(query);
 
   React.useEffect(() => {
@@ -323,6 +713,68 @@ export function WorkOrdersPage() {
     fetchWorkOrders,
     listParams
   );
+  const contractParams = React.useMemo(
+    () => ({ perPage: 100, sort: "-start_date" }),
+    []
+  );
+  const userParams = React.useMemo(() => ({ perPage: 100, sort: "name" }), []);
+  const { items: contractOptions } = useList(fetchContracts, contractParams);
+  const { items: userOptions } = useList(fetchUsers, userParams);
+
+  const openCreate = () => {
+    setEditingWorkOrder(null);
+    setFormErrors({});
+    setFormError(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (workOrder: WorkOrder) => {
+    setSelected(null);
+    setEditingWorkOrder(workOrder);
+    setFormErrors({});
+    setFormError(null);
+    setFormOpen(true);
+  };
+
+  const handleSubmit = async (values: WorkOrderFormValues) => {
+    setSubmitting(true);
+    setFormErrors({});
+    setFormError(null);
+
+    try {
+      const input = formToInput(values);
+      if (editingWorkOrder) {
+        await updateWorkOrder(editingWorkOrder.id, input);
+      } else {
+        await createWorkOrder(input);
+      }
+      setFormOpen(false);
+      setEditingWorkOrder(null);
+      reload();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setFormErrors(err.details);
+        setFormError(err.message);
+      } else {
+        setFormError("Beklenmeyen bir hata oluştu.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingWorkOrder) return;
+    setDeleting(true);
+
+    try {
+      await deleteWorkOrder(deletingWorkOrder.id);
+      setDeletingWorkOrder(null);
+      reload();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -331,7 +783,7 @@ export function WorkOrdersPage() {
         description="Bakım, arıza ve muayene işleri"
         count={pagination?.total ?? workOrders.length}
         actions={
-          <Button>
+          <Button onClick={openCreate}>
             <Plus />
             Yeni İş Emri
           </Button>
@@ -367,6 +819,28 @@ export function WorkOrdersPage() {
         getRowId={(wo) => wo.id}
         onRowClick={setSelected}
         isLoading={isLoading}
+        rowActions={(workOrder) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label="İş emri işlemleri">
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => openEdit(workOrder)}>
+                <Pencil className="size-4" />
+                Düzenle
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-danger focus:text-danger"
+                onSelect={() => setDeletingWorkOrder(workOrder)}
+              >
+                <Trash2 className="size-4" />
+                Sil
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         empty={
           <EmptyState
             icon={ClipboardList}
@@ -378,7 +852,60 @@ export function WorkOrdersPage() {
 
       <Pagination pagination={pagination} onPageChange={setPage} />
 
-      <WorkOrderSheet workOrder={selected} onClose={() => setSelected(null)} />
+      <WorkOrderSheet
+        workOrder={selected}
+        onClose={() => setSelected(null)}
+        onEdit={openEdit}
+        onDelete={(workOrder) => {
+          setSelected(null);
+          setDeletingWorkOrder(workOrder);
+        }}
+      />
+
+      <WorkOrderFormDialog
+        open={formOpen}
+        workOrder={editingWorkOrder}
+        contracts={contractOptions}
+        users={userOptions}
+        errors={formErrors}
+        formError={formError}
+        isSubmitting={isSubmitting}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditingWorkOrder(null);
+        }}
+        onSubmit={handleSubmit}
+      />
+
+      <Dialog
+        open={!!deletingWorkOrder}
+        onOpenChange={(open) => !open && setDeletingWorkOrder(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>İş Emrini Sil</DialogTitle>
+            <DialogDescription>
+              {deletingWorkOrder
+                ? `${deletingWorkOrder.work_order_number} numaralı iş emri silinecek.`
+                : ""}{" "}
+              Bu işlem kaydı liste görünümünden kaldırır.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setDeletingWorkOrder(null)}
+            >
+              Vazgeç
+            </Button>
+            <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
+              {isDeleting && <Loader2 className="animate-spin" />}
+              Sil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

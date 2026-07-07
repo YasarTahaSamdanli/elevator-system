@@ -8,6 +8,7 @@ import { BuildingsPage } from "@/pages/BuildingsPage";
 import { ElevatorsPage } from "@/pages/ElevatorsPage";
 import { WorkOrdersPage } from "@/pages/WorkOrdersPage";
 import { ContractsPage } from "@/pages/ContractsPage";
+import { QrLabelsPage } from "@/pages/QrLabelsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="/elevators" element={<ElevatorsPage />} />
               <Route path="/work-orders" element={<WorkOrdersPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
+              <Route path="/qr-labels" element={<QrLabelsPage />} />
               <Route path="/team" element={<UsersPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
