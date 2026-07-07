@@ -1,8 +1,10 @@
 import * as React from "react";
 import {
   AlertTriangle,
+  Ban,
   CalendarClock,
   CheckCircle2,
+  Circle,
   ClipboardCheck,
   ClipboardList,
   Hammer,
@@ -68,8 +70,11 @@ import {
   deleteWorkOrder,
   fetchContracts,
   fetchUsers,
+  fetchWorkOrder,
   fetchWorkOrders,
   updateWorkOrder,
+  updateWorkOrderChecklistItem,
+  updateWorkOrderStatus,
   type WorkOrderInput,
 } from "@/api/resources";
 import { useDebounced, useList } from "@/hooks/useList";
@@ -78,6 +83,7 @@ import type {
   ServiceContract,
   User,
   WorkOrder,
+  WorkOrderChecklistItem,
   WorkOrderPriority,
   WorkOrderStatus,
   WorkOrderType,
@@ -209,18 +215,106 @@ function TimelineItem({
   );
 }
 
+/** The forward transition offered as the primary quick action per status. */
+const nextTransition: Partial<Record<WorkOrderStatus, { status: WorkOrderStatus; label: string }>> = {
+  draft: { status: "in_progress", label: "Başlat" },
+  planned: { status: "in_progress", label: "Başlat" },
+  assigned: { status: "in_progress", label: "Başlat" },
+  in_progress: { status: "completed", label: "Tamamla" },
+};
+
 function WorkOrderSheet({
   workOrder,
   onClose,
   onEdit,
   onDelete,
+  onChanged,
 }: {
   workOrder: WorkOrder | null;
   onClose: () => void;
   onEdit: (workOrder: WorkOrder) => void;
   onDelete: (workOrder: WorkOrder) => void;
+  onChanged: () => void;
 }) {
-  const TypeIcon = workOrder ? typeIcons[workOrder.type] : null;
+  const [detail, setDetail] = React.useState<WorkOrder | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const [isTransitioning, setTransitioning] = React.useState(false);
+  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
+
+  const workOrderId = workOrder?.id;
+
+  React.useEffect(() => {
+    setDetail(null);
+    setActionError(null);
+    setConfirmingCancel(false);
+    if (!workOrderId) return;
+
+    let stale = false;
+    fetchWorkOrder(workOrderId)
+      .then((loaded) => {
+        if (!stale) setDetail(loaded);
+      })
+      .catch(() => {
+        if (!stale) setActionError("İş emri detayı yüklenemedi.");
+      });
+
+    return () => {
+      stale = true;
+    };
+  }, [workOrderId]);
+
+  // The list row opens the sheet instantly; the detail response replaces it
+  // once loaded (same fields plus the checklist).
+  const shown = detail ?? workOrder;
+  const checklist = detail?.checklist ?? [];
+  const doneCount = checklist.filter((item) => item.is_done).length;
+
+  const toggleItem = async (item: WorkOrderChecklistItem) => {
+    if (!detail) return;
+    const nextDone = !item.is_done;
+
+    const apply = (done: boolean) =>
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              checklist: prev.checklist?.map((row) =>
+                row.id === item.id ? { ...row, is_done: done } : row
+              ),
+            }
+          : prev
+      );
+
+    apply(nextDone);
+    try {
+      await updateWorkOrderChecklistItem(detail.id, item.id, { is_done: nextDone });
+    } catch {
+      apply(!nextDone);
+      setActionError("Kontrol maddesi güncellenemedi.");
+    }
+  };
+
+  const transition = async (status: WorkOrderStatus) => {
+    if (!workOrderId) return;
+    setTransitioning(true);
+    setActionError(null);
+
+    try {
+      const updated = await updateWorkOrderStatus(workOrderId, status);
+      setDetail(updated);
+      setConfirmingCancel(false);
+      onChanged();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Durum güncellenemedi.");
+    } finally {
+      setTransitioning(false);
+    }
+  };
+
+  const quickAction = shown ? nextTransition[shown.status] : undefined;
+  const cancellable = shown ? shown.status !== "completed" && shown.status !== "cancelled" : false;
+
+  const TypeIcon = shown ? typeIcons[shown.type] : null;
 
   return (
     <Sheet open={!!workOrder} onOpenChange={(open) => !open && onClose()}>
@@ -228,47 +322,47 @@ function WorkOrderSheet({
         className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        {workOrder && TypeIcon && (
+        {shown && TypeIcon && (
           <>
             <SheetHeader className="space-y-2 border-b border-border px-6 py-5 pr-14">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <TypeIcon className="size-3.5" />
-                {workOrderTypeMeta[workOrder.type].label}
+                {workOrderTypeMeta[shown.type].label}
               </div>
               <SheetTitle className="font-mono text-lg">
-                {workOrder.work_order_number}
+                {shown.work_order_number}
               </SheetTitle>
               <SheetDescription>
-                {workOrder.building_name} · {workOrder.elevator_name}
+                {shown.building_name} · {shown.elevator_name}
               </SheetDescription>
               <div className="flex flex-wrap gap-2 pt-1.5">
-                <StatusBadge meta={workOrderStatusMeta[workOrder.status]} dot={false} />
-                <StatusBadge meta={workOrderPriorityMeta[workOrder.priority]} />
+                <StatusBadge meta={workOrderStatusMeta[shown.status]} dot={false} />
+                <StatusBadge meta={workOrderPriorityMeta[shown.priority]} />
               </div>
             </SheetHeader>
 
             <div className="flex-1 space-y-7 overflow-y-auto px-6 py-6">
-              {workOrder.description && (
+              {shown.description && (
                 <section className="space-y-2.5">
                   <SectionLabel>Açıklama</SectionLabel>
                   <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm leading-6 text-foreground">
-                    {workOrder.description}
+                    {shown.description}
                   </p>
                 </section>
               )}
 
               <section className="space-y-2.5">
                 <SectionLabel>Teknisyen</SectionLabel>
-                {workOrder.assigned_user ? (
+                {shown.assigned_user ? (
                   <div className="flex items-center gap-3">
                     <Avatar className="size-9">
                       <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                        {initials(workOrder.assigned_user.name)}
+                        {initials(shown.assigned_user.name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="leading-tight">
                       <div className="text-sm font-medium text-foreground">
-                        {workOrder.assigned_user.name}
+                        {shown.assigned_user.name}
                       </div>
                       <div className="text-xs text-muted-foreground">Saha Teknisyeni</div>
                     </div>
@@ -284,48 +378,148 @@ function WorkOrderSheet({
                   <TimelineItem
                     icon={CalendarClock}
                     label="Planlandı"
-                    value={workOrder.scheduled_at}
-                    done={!!workOrder.scheduled_at}
+                    value={shown.scheduled_at}
+                    done={!!shown.scheduled_at}
                   />
                   <TimelineItem
                     icon={Play}
                     label="Çalışma Başladı"
-                    value={workOrder.started_at}
-                    done={!!workOrder.started_at}
+                    value={shown.started_at}
+                    done={!!shown.started_at}
                   />
                   <TimelineItem
                     icon={CheckCircle2}
                     label="Tamamlandı"
-                    value={workOrder.completed_at}
-                    done={!!workOrder.completed_at}
+                    value={shown.completed_at}
+                    done={!!shown.completed_at}
                     last
                   />
                 </div>
               </section>
 
-              {workOrder.notes && (
+              {!detail && !actionError && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Kontrol listesi yükleniyor...
+                </div>
+              )}
+
+              {checklist.length > 0 && (
+                <section className="space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <SectionLabel>Kontrol Listesi</SectionLabel>
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {doneCount}/{checklist.length}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {checklist.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => void toggleItem(item)}
+                        className="flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
+                      >
+                        {item.is_done ? (
+                          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                        ) : (
+                          <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <span
+                          className={cn(
+                            "leading-5",
+                            item.is_done && "text-muted-foreground line-through"
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {shown.notes && (
                 <section className="space-y-2.5">
                   <SectionLabel>Notlar</SectionLabel>
                   <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm leading-6 text-foreground">
-                    {workOrder.notes}
+                    {shown.notes}
                   </p>
                 </section>
               )}
             </div>
 
-            <div className="flex gap-2 border-t border-border px-6 py-4">
-              <Button className="flex-1" onClick={() => onEdit(workOrder)}>
-                <Pencil />
-                Düzenle
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 text-danger hover:text-danger"
-                onClick={() => onDelete(workOrder)}
-              >
-                <Trash2 />
-                Sil
-              </Button>
+            <div className="space-y-2 border-t border-border px-6 py-4">
+              {actionError && (
+                <p className="text-xs text-danger-foreground">{actionError}</p>
+              )}
+
+              {(quickAction || cancellable) && (
+                <div className="flex gap-2">
+                  {quickAction && (
+                    <Button
+                      className="flex-1"
+                      disabled={isTransitioning}
+                      onClick={() => void transition(quickAction.status)}
+                    >
+                      {isTransitioning ? (
+                        <Loader2 className="animate-spin" />
+                      ) : quickAction.status === "completed" ? (
+                        <CheckCircle2 />
+                      ) : (
+                        <Play />
+                      )}
+                      {quickAction.label}
+                    </Button>
+                  )}
+                  {cancellable &&
+                    (confirmingCancel ? (
+                      <>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          disabled={isTransitioning}
+                          onClick={() => void transition("cancelled")}
+                        >
+                          <Ban />
+                          İptali Onayla
+                        </Button>
+                        <Button
+                          variant="outline"
+                          disabled={isTransitioning}
+                          onClick={() => setConfirmingCancel(false)}
+                        >
+                          Vazgeç
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className={cn("text-danger hover:text-danger", !quickAction && "flex-1")}
+                        disabled={isTransitioning}
+                        onClick={() => setConfirmingCancel(true)}
+                      >
+                        <Ban />
+                        İptal Et
+                      </Button>
+                    ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => onEdit(shown)}>
+                  <Pencil />
+                  Düzenle
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 text-danger hover:text-danger"
+                  onClick={() => onDelete(shown)}
+                >
+                  <Trash2 />
+                  Sil
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -860,6 +1054,7 @@ export function WorkOrdersPage() {
           setSelected(null);
           setDeletingWorkOrder(workOrder);
         }}
+        onChanged={reload}
       />
 
       <WorkOrderFormDialog

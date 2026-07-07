@@ -9,6 +9,7 @@ use App\Http\Resources\WorkOrderResource;
 use App\Models\ServiceContract;
 use App\Models\User;
 use App\Models\WorkOrder;
+use App\Services\WorkOrderChecklistService;
 use App\Support\ApiResponse;
 use App\Support\ListQuery;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,11 +45,11 @@ class WorkOrderController extends Controller
     public function show(WorkOrder $workOrder): JsonResponse
     {
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
         );
     }
 
-    public function store(StoreWorkOrderRequest $request): JsonResponse
+    public function store(StoreWorkOrderRequest $request, WorkOrderChecklistService $checklistService): JsonResponse
     {
         $data = $request->validated();
 
@@ -62,9 +63,10 @@ class WorkOrderController extends Controller
         }
 
         $workOrder = WorkOrder::create($data);
+        $checklistService->applyTemplate($workOrder);
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
             message: 'Work order created successfully.',
             status: 201,
         );
@@ -85,10 +87,22 @@ class WorkOrderController extends Controller
             unset($data['assigned_user_uuid']);
         }
 
+        // Lifecycle timestamps follow the status when the client doesn't
+        // supply them explicitly.
+        $status = $data['status'] ?? null;
+
+        if ($status === 'in_progress' && ! array_key_exists('started_at', $data) && $workOrder->started_at === null) {
+            $data['started_at'] = now();
+        }
+
+        if ($status === 'completed' && ! array_key_exists('completed_at', $data) && $workOrder->completed_at === null) {
+            $data['completed_at'] = now();
+        }
+
         $workOrder->update($data);
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract.elevator.building', 'assignedUser'])),
+            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
             message: 'Work order updated successfully.',
         );
     }

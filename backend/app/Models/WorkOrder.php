@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -60,9 +61,46 @@ class WorkOrder extends Model
         return 'uuid';
     }
 
+    /**
+     * Lifecycle order of the non-terminal statuses. Transitions may only
+     * move forward along this chain (skipping steps is allowed);
+     * "cancelled" is reachable from every non-terminal status.
+     *
+     * @var array<string, int>
+     */
+    public const STATUS_ORDER = [
+        'draft' => 0,
+        'planned' => 1,
+        'assigned' => 2,
+        'in_progress' => 3,
+        'completed' => 4,
+    ];
+
+    public function canTransitionTo(string $status): bool
+    {
+        if ($status === $this->status) {
+            return true;
+        }
+
+        if (in_array($this->status, ['completed', 'cancelled'], true)) {
+            return false;
+        }
+
+        if ($status === 'cancelled') {
+            return true;
+        }
+
+        return self::STATUS_ORDER[$status] > self::STATUS_ORDER[$this->status];
+    }
+
     public function serviceContract(): BelongsTo
     {
         return $this->belongsTo(ServiceContract::class);
+    }
+
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(WorkOrderChecklistItem::class)->orderBy('position');
     }
 
     public function assignedUser(): BelongsTo

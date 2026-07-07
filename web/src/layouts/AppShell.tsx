@@ -38,7 +38,10 @@ import { useAuth } from "@/providers/AuthProvider";
 import { navItems } from "@/lib/navigation";
 import { initials, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { buildings, elevators, notifications, workOrders } from "@/mock";
+import { fetchOperationalNotifications } from "@/api/dashboard";
+import { fetchBuildings, fetchElevators, fetchWorkOrders } from "@/api/resources";
+import { useList } from "@/hooks/useList";
+import type { AppNotification, Building, Elevator, WorkOrder } from "@/types";
 
 function BrandMark() {
   return (
@@ -82,9 +85,15 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 function CommandPalette({
   open,
   onOpenChange,
+  buildings,
+  elevators,
+  workOrders,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  buildings: Building[];
+  elevators: Elevator[];
+  workOrders: WorkOrder[];
 }) {
   const navigate = useNavigate();
 
@@ -148,8 +157,32 @@ function CommandPalette({
   );
 }
 
+/**
+ * Notifications are derived from live operational state (see
+ * fetchOperationalNotifications) — there's no notifications table, so
+ * "read" only lives in this component's state for the current session.
+ */
 function NotificationsPopover() {
-  const [items, setItems] = React.useState(notifications);
+  const [items, setItems] = React.useState<AppNotification[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchOperationalNotifications()
+      .then((data) => {
+        if (!cancelled) setItems(data);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const unread = items.filter((n) => !n.read).length;
 
   return (
@@ -177,23 +210,31 @@ function NotificationsPopover() {
           )}
         </div>
         <ScrollArea className="max-h-80">
-          <div className="divide-y divide-border">
-            {items.map((n) => (
-              <div key={n.id} className={cn("flex gap-3 px-4 py-3", !n.read && "bg-primary/5")}>
-                <span
-                  className={cn(
-                    "mt-1.5 size-1.5 shrink-0 rounded-full",
-                    n.read ? "bg-transparent" : "bg-primary"
-                  )}
-                />
-                <div className="min-w-0 space-y-0.5">
-                  <div className="text-sm font-medium text-foreground">{n.title}</div>
-                  <p className="text-xs leading-5 text-muted-foreground">{n.body}</p>
-                  <div className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</div>
+          {isLoading ? (
+            <div className="px-4 py-6 text-center text-sm text-muted-foreground">Yükleniyor...</div>
+          ) : items.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+              Bildirim yok.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {items.map((n) => (
+                <div key={n.id} className={cn("flex gap-3 px-4 py-3", !n.read && "bg-primary/5")}>
+                  <span
+                    className={cn(
+                      "mt-1.5 size-1.5 shrink-0 rounded-full",
+                      n.read ? "bg-transparent" : "bg-primary"
+                    )}
+                  />
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-sm font-medium text-foreground">{n.title}</div>
+                    <p className="text-xs leading-5 text-muted-foreground">{n.body}</p>
+                    <div className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </PopoverContent>
     </Popover>
@@ -254,11 +295,18 @@ function UserMenu() {
   );
 }
 
+const quickBuildingParams = { perPage: 50, sort: "name" };
+const quickElevatorParams = { perPage: 50, sort: "name" };
+const quickWorkOrderParams = { perPage: 20, sort: "-scheduled_at" };
+
 export function AppShell() {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const { items: quickBuildings } = useList(fetchBuildings, quickBuildingParams);
+  const { items: quickElevators } = useList(fetchElevators, quickElevatorParams);
+  const { items: quickWorkOrders } = useList(fetchWorkOrders, quickWorkOrderParams);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -358,7 +406,13 @@ export function AppShell() {
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        buildings={quickBuildings}
+        elevators={quickElevators}
+        workOrders={quickWorkOrders}
+      />
     </div>
   );
 }

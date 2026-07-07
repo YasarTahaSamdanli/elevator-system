@@ -85,6 +85,14 @@ interface ContractPayload {
   notes: string | null;
 }
 
+interface ChecklistItemPayload {
+  uuid: string;
+  position: number;
+  label: string;
+  is_done: boolean;
+  note: string | null;
+}
+
 interface WorkOrderPayload {
   uuid: string;
   work_order_number: string;
@@ -100,6 +108,10 @@ interface WorkOrderPayload {
   completed_at: string | null;
   description: string | null;
   notes: string | null;
+  /** Only included on detail responses (show/store/update). */
+  checklist?: ChecklistItemPayload[];
+  created_at: string;
+  updated_at: string;
 }
 
 interface UserPayload {
@@ -187,6 +199,15 @@ function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
     building_name: p.building.name ?? "—",
     description: p.description,
     notes: p.notes,
+    checklist: p.checklist?.map((item) => ({
+      id: item.uuid,
+      position: item.position,
+      label: item.label,
+      is_done: item.is_done,
+      note: item.note,
+    })),
+    created_at: p.created_at,
+    updated_at: p.updated_at,
   };
 }
 
@@ -314,6 +335,34 @@ export async function deleteContract(uuid: string): Promise<void> {
 export const fetchWorkOrders = (params: ListParams = {}) =>
   fetchList<WorkOrderPayload, WorkOrder>("/work-orders", params, mapWorkOrder);
 
+export async function fetchWorkOrder(uuid: string): Promise<WorkOrder> {
+  const { data } = await api<WorkOrderPayload>(`/work-orders/${uuid}`);
+  return mapWorkOrder(data);
+}
+
+/** Partial update used by the quick status-transition buttons. */
+export async function updateWorkOrderStatus(
+  uuid: string,
+  status: WorkOrder["status"]
+): Promise<WorkOrder> {
+  const { data } = await api<WorkOrderPayload>(`/work-orders/${uuid}`, {
+    method: "PUT",
+    body: { status },
+  });
+  return mapWorkOrder(data);
+}
+
+export async function updateWorkOrderChecklistItem(
+  workOrderUuid: string,
+  itemUuid: string,
+  body: { is_done?: boolean; note?: string | null }
+): Promise<void> {
+  await api(`/work-orders/${workOrderUuid}/checklist-items/${itemUuid}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
 export interface WorkOrderInput {
   service_contract_uuid: string;
   type: WorkOrder["type"];
@@ -349,6 +398,38 @@ export async function deleteWorkOrder(uuid: string): Promise<void> {
 
 export const fetchUsers = (params: ListParams = {}) =>
   fetchList<UserPayload, User>("/users", params, mapUser);
+
+export interface UserInput {
+  name: string;
+  email: string;
+  phone: string | null;
+  password?: string;
+  role: UserRole;
+  is_active: boolean;
+}
+
+export async function createUser(input: UserInput & { password: string }): Promise<User> {
+  const { data } = await api<UserPayload>("/users", {
+    method: "POST",
+    body: input,
+  });
+  return mapUser(data);
+}
+
+export async function updateUser(uuid: string, input: UserInput): Promise<User> {
+  const body = { ...input };
+  if (!body.password) delete body.password;
+
+  const { data } = await api<UserPayload>(`/users/${uuid}`, {
+    method: "PUT",
+    body,
+  });
+  return mapUser(data);
+}
+
+export async function deleteUser(uuid: string): Promise<void> {
+  await api(`/users/${uuid}`, { method: "DELETE" });
+}
 
 /* ---------- auth ---------- */
 

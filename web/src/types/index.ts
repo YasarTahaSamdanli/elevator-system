@@ -112,6 +112,14 @@ export interface ServiceContract {
   notes: string | null;
 }
 
+export interface WorkOrderChecklistItem {
+  id: UUID;
+  position: number;
+  label: string;
+  is_done: boolean;
+  note: string | null;
+}
+
 export interface WorkOrder {
   id: UUID;
   service_contract_id: UUID;
@@ -127,6 +135,10 @@ export interface WorkOrder {
   building_name: string;
   description: string | null;
   notes: string | null;
+  /** Only present on detail responses (show/store/update). */
+  checklist?: WorkOrderChecklistItem[];
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
 }
 
 export interface AppNotification {

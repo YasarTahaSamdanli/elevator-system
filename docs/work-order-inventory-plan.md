@@ -60,6 +60,10 @@ Tümü mevcut kalıba uyar: UUID kimlik, soft delete, `BelongsToCompany` scope,
 
 ## Fazlar
 
+> **Durum (2026-07-07):** Faz 1 tamamlandı — iş emri CRUD + detay paneli,
+> durum geçiş kuralları (backend + hızlı butonlar), kontrol listesi şablonları
+> ve iş emri kontrol listesi uygulandı. Sırada Faz 2 var.
+
 - **Faz 1 — İş emri modülü tamamlama:** İş emirleri sayfasına CRUD arayüzü
   (binalar/asansörler/sözleşmelerdeki kalıp) + iş emri detay sayfası + kontrol
   listesi + malzeme satırları (katalog henüz yokken geçici serbest satır YOK —

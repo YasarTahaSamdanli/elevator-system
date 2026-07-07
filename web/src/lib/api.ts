@@ -72,7 +72,7 @@ export interface ListParams {
   perPage?: number;
   search?: string;
   sort?: string;
-  filter?: Record<string, string>;
+  filter?: Record<string, string | string[]>;
 }
 
 export function listQueryString(params: ListParams): string {
@@ -82,7 +82,13 @@ export function listQueryString(params: ListParams): string {
   if (params.search?.trim()) query.set("search", params.search.trim());
   if (params.sort) query.set("sort", params.sort);
   for (const [field, value] of Object.entries(params.filter ?? {})) {
-    if (value !== "") query.set(`filter[${field}]`, value);
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (v !== "") query.append(`filter[${field}][]`, v);
+      }
+    } else if (value !== "") {
+      query.set(`filter[${field}]`, value);
+    }
   }
   const s = query.toString();
   return s ? `?${s}` : "";
