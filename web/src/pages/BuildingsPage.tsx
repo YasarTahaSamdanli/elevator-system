@@ -7,6 +7,7 @@ import { ALL_VALUE, FilterSelect } from "@/components/common/FilterSelect";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListError } from "@/components/common/ListError";
+import { LocationPicker } from "@/components/common/LocationPicker";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -63,9 +64,16 @@ const columns: Column<Building>[] = [
     header: "Konum",
     sortAccessor: (b) => `${b.city} ${b.district}`,
     cell: (b) => (
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <MapPin className="size-3.5 shrink-0" />
-        {b.district} / {b.city}
+      <div className="min-w-0 max-w-xs">
+        <div className="flex items-center gap-1.5 text-foreground">
+          <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate" title={b.address}>
+            {b.address}
+          </span>
+        </div>
+        <div className="pl-5 text-xs text-muted-foreground">
+          {b.district} / {b.city}
+        </div>
       </div>
     ),
   },
@@ -222,7 +230,10 @@ function BuildingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? "Binayı Düzenle" : "Yeni Bina"}</DialogTitle>
           <DialogDescription>
@@ -235,7 +246,6 @@ function BuildingFormDialog({
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            console.log("building form submit");
             void onSubmit(values);
           }}
         >
@@ -297,6 +307,21 @@ function BuildingFormDialog({
                 onChange={(event) => setValue("manager_phone", event.target.value)}
               />
             </Field>
+          </div>
+
+          <div className="space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Konum</span>
+            <LocationPicker
+              latitude={values.latitude}
+              longitude={values.longitude}
+              searchQuery={[values.address, values.district, values.city]
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .join(", ")}
+              onChange={(latitude, longitude) =>
+                setValues((prev) => ({ ...prev, latitude, longitude }))
+              }
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -362,7 +387,7 @@ function BuildingFormDialog({
 
 export function BuildingsPage() {
   const [query, setQuery] = React.useState("");
-  const [city, setCity] = React.useState(ALL_VALUE);
+  const [district, setDistrict] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingBuilding, setEditingBuilding] = React.useState<Building | null>(null);
@@ -375,13 +400,13 @@ export function BuildingsPage() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedQuery, city]);
+  }, [debouncedQuery, district]);
 
   const listFilter = React.useMemo<Record<string, string>>(() => {
     const filter: Record<string, string> = {};
-    if (city !== ALL_VALUE) filter.city = city;
+    if (district !== ALL_VALUE) filter.district = district;
     return filter;
-  }, [city]);
+  }, [district]);
 
   const listParams = React.useMemo(
     () => ({
@@ -398,13 +423,16 @@ export function BuildingsPage() {
     fetchBuildings,
     listParams
   );
-  const { items: cityBuildings, reload: reloadCityOptions } = useList(fetchBuildings, optionParams);
-  const cities = React.useMemo(
+  const { items: optionBuildings, reload: reloadDistrictOptions } = useList(
+    fetchBuildings,
+    optionParams
+  );
+  const districts = React.useMemo(
     () =>
-      [...new Set(cityBuildings.map((b) => b.city))].sort((a, b) =>
+      [...new Set(optionBuildings.map((b) => b.district))].sort((a, b) =>
         a.localeCompare(b, "tr-TR")
       ),
-    [cityBuildings]
+    [optionBuildings]
   );
 
   const openCreate = () => {
@@ -428,17 +456,15 @@ export function BuildingsPage() {
 
     try {
       const input = formToInput(values);
-      console.log("building submit payload", input);
       if (editingBuilding) {
         await updateBuilding(editingBuilding.id, input);
       } else {
         await createBuilding(input);
       }
-      console.log("building submit success");
       setFormOpen(false);
       setEditingBuilding(null);
       reload();
-      reloadCityOptions();
+      reloadDistrictOptions();
     } catch (err) {
       if (err instanceof ApiError) {
         setFormErrors(err.details);
@@ -459,7 +485,7 @@ export function BuildingsPage() {
       await deleteBuilding(deletingBuilding.id);
       setDeletingBuilding(null);
       reload();
-      reloadCityOptions();
+      reloadDistrictOptions();
     } finally {
       setDeleting(false);
     }
@@ -482,10 +508,10 @@ export function BuildingsPage() {
       <Toolbar>
         <SearchInput value={query} onChange={setQuery} placeholder="Bina, kod veya yönetici ara..." />
         <FilterSelect
-          value={city}
-          onChange={setCity}
-          allLabel="Tüm Şehirler"
-          options={cities.map((c) => ({ value: c, label: c }))}
+          value={district}
+          onChange={setDistrict}
+          allLabel="Tüm İlçeler"
+          options={districts.map((d) => ({ value: d, label: d }))}
         />
       </Toolbar>
 

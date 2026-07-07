@@ -24,7 +24,9 @@ docker compose exec app php artisan migrate
 docker compose exec app php artisan db:seed            # seeds default roles (DefaultRoleSeeder)
 ```
 
-Without Docker, from `backend/`: `composer install`, `php artisan serve`, `php artisan test`. Tests run against in-memory SQLite (see `phpunit.xml`), not Postgres — no DB setup needed to run the suite. `composer test` clears config cache then runs `artisan test`.
+Without Docker, from `backend/`: `composer install`, `php artisan serve`, `php artisan test`. Tests run against in-memory SQLite, not Postgres — no DB setup needed to run the suite. `composer test` clears config cache then runs `artisan test`.
+
+⚠️ The SQLite override lives in `tests/bootstrap.php` (mirrored in `phpunit.xml`); keep both in sync. Inside Docker the `.env` values are real OS env vars, which Laravel's `env()` reads from `$_SERVER` with higher precedence than PHPUnit's `<env>` (even `force="true"`) — without the bootstrap guard, `RefreshDatabase` wipes the real Postgres dev database.
 
 Health check: `GET /up`. API is namespaced under `/api/v1` (see `routes/api.php`).
 
