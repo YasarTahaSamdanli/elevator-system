@@ -6,12 +6,15 @@ import { SearchInput } from "@/components/common/SearchInput";
 import { ALL_VALUE, FilterSelect } from "@/components/common/FilterSelect";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ListError } from "@/components/common/ListError";
+import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { contractStatusMeta } from "@/lib/status";
 import { daysUntil, formatCurrency, formatDate } from "@/lib/format";
-import { contracts } from "@/mock";
+import { fetchContracts } from "@/api/resources";
+import { useDebounced, useList } from "@/hooks/useList";
 import type { ContractStatus, ServiceContract } from "@/types";
 
 const columns: Column<ServiceContract>[] = [
@@ -74,22 +77,40 @@ const statusOptions = (Object.keys(contractStatusMeta) as ContractStatus[]).map(
 export function ContractsPage() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState(ALL_VALUE);
+  const [page, setPage] = React.useState(1);
+  const debouncedQuery = useDebounced(query);
 
-  const filtered = contracts.filter((c) => {
-    if (status !== ALL_VALUE && c.status !== status) return false;
-    if (!query) return true;
-    const q = query.toLocaleLowerCase("tr-TR");
-    return [c.contract_number, c.building_name, c.elevator_name]
-      .filter(Boolean)
-      .some((v) => v!.toLocaleLowerCase("tr-TR").includes(q));
-  });
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, status]);
+
+  const listFilter = React.useMemo<Record<string, string>>(() => {
+    const filter: Record<string, string> = {};
+    if (status !== ALL_VALUE) filter.status = status;
+    return filter;
+  }, [status]);
+
+  const listParams = React.useMemo(
+    () => ({
+      page,
+      perPage: 25,
+      search: debouncedQuery,
+      sort: "end_date",
+      filter: listFilter,
+    }),
+    [page, debouncedQuery, listFilter]
+  );
+  const { items: contracts, pagination, isLoading, error, reload } = useList(
+    fetchContracts,
+    listParams
+  );
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Sözleşmeler"
         description="Asansör bakım sözleşmeleri ve yenileme takibi"
-        count={contracts.length}
+        count={pagination?.total ?? contracts.length}
         actions={
           <Button>
             <Plus />
@@ -112,10 +133,13 @@ export function ContractsPage() {
         />
       </Toolbar>
 
+      {error && <ListError message={error.message} onRetry={reload} />}
+
       <DataTable
         columns={columns}
-        data={filtered}
+        data={contracts}
         getRowId={(c) => c.id}
+        isLoading={isLoading}
         empty={
           <EmptyState
             icon={FileText}
@@ -124,6 +148,8 @@ export function ContractsPage() {
           />
         }
       />
+
+      <Pagination pagination={pagination} onPageChange={setPage} />
     </div>
   );
 }

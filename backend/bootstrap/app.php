@@ -18,7 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->statefulApi();
+        // No statefulApi(): the SPA authenticates with Sanctum bearer tokens,
+        // not session cookies, so API requests must stay stateless (otherwise
+        // Sanctum injects CSRF validation for browser-originated requests).
         $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -7,6 +7,7 @@
 
 const API_BASE: string = import.meta.env.VITE_API_URL ?? "/api/v1";
 const TOKEN_KEY = "asansor-token";
+let memoryToken: string | null = null;
 
 export interface PaginationMeta {
   page: number;
@@ -34,15 +35,33 @@ export class ApiError extends Error {
 }
 
 export function getToken(): string | null {
-  return window.localStorage.getItem(TOKEN_KEY);
+  try {
+    memoryToken = window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    /* Storage can be unavailable in hardened browser contexts. */
+  }
+
+  return memoryToken;
 }
 
 export function setToken(token: string): void {
-  window.localStorage.setItem(TOKEN_KEY, token);
+  memoryToken = token;
+
+  try {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* Keep the in-memory token for the current session. */
+  }
 }
 
 export function clearToken(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
+  memoryToken = null;
+
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* Nothing else to clear. */
+  }
 }
 
 /** Fired when the API answers 401 so the auth provider can reset state. */

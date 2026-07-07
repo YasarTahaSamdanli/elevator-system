@@ -6,12 +6,15 @@ import { SearchInput } from "@/components/common/SearchInput";
 import { ALL_VALUE, FilterSelect } from "@/components/common/FilterSelect";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ListError } from "@/components/common/ListError";
+import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { initials } from "@/lib/format";
-import { users } from "@/mock";
+import { fetchUsers } from "@/api/resources";
+import { useDebounced, useList } from "@/hooks/useList";
 import type { User, UserRole } from "@/types";
 
 const activeMeta = { label: "Aktif", variant: "success", dot: "bg-success" } as const;
@@ -73,22 +76,37 @@ const roleOptions = (Object.keys(roleVariant) as UserRole[]).map((r) => ({
 export function UsersPage() {
   const [query, setQuery] = React.useState("");
   const [role, setRole] = React.useState(ALL_VALUE);
+  const [page, setPage] = React.useState(1);
+  const debouncedQuery = useDebounced(query);
 
-  const filtered = users.filter((u) => {
-    if (role !== ALL_VALUE && u.role !== role) return false;
-    if (!query) return true;
-    const q = query.toLocaleLowerCase("tr-TR");
-    return [u.name, u.email, u.phone]
-      .filter(Boolean)
-      .some((v) => v!.toLocaleLowerCase("tr-TR").includes(q));
-  });
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, role]);
+
+  const listFilter = React.useMemo<Record<string, string>>(() => {
+    const filter: Record<string, string> = {};
+    if (role !== ALL_VALUE) filter.role = role;
+    return filter;
+  }, [role]);
+
+  const listParams = React.useMemo(
+    () => ({
+      page,
+      perPage: 25,
+      search: debouncedQuery,
+      sort: "name",
+      filter: listFilter,
+    }),
+    [page, debouncedQuery, listFilter]
+  );
+  const { items: users, pagination, isLoading, error, reload } = useList(fetchUsers, listParams);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Ekip"
         description="Şirket kullanıcıları ve saha teknisyenleri"
-        count={users.length}
+        count={pagination?.total ?? users.length}
         actions={
           <Button>
             <Plus />
@@ -107,10 +125,13 @@ export function UsersPage() {
         />
       </Toolbar>
 
+      {error && <ListError message={error.message} onRetry={reload} />}
+
       <DataTable
         columns={columns}
-        data={filtered}
+        data={users}
         getRowId={(u) => u.id}
+        isLoading={isLoading}
         empty={
           <EmptyState
             icon={UsersIcon}
@@ -119,6 +140,8 @@ export function UsersPage() {
           />
         }
       />
+
+      <Pagination pagination={pagination} onPageChange={setPage} />
     </div>
   );
 }

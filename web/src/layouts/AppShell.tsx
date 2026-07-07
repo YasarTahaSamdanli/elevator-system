@@ -34,10 +34,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useAuth } from "@/providers/AuthProvider";
 import { navItems } from "@/lib/navigation";
 import { initials, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { buildings, currentUser, elevators, notifications, workOrders } from "@/mock";
+import { buildings, elevators, notifications, workOrders } from "@/mock";
 
 function BrandMark() {
   return (
@@ -200,6 +201,14 @@ function NotificationsPopover() {
 }
 
 function UserMenu() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -210,15 +219,15 @@ function UserMenu() {
         >
           <Avatar className="size-8">
             <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-              {initials(currentUser.name)}
+              {initials(user?.name ?? "Kullanici")}
             </AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
-          <div className="text-sm font-medium">{currentUser.name}</div>
-          <div className="text-xs font-normal text-muted-foreground">{currentUser.email}</div>
+          <div className="text-sm font-medium">{user?.name}</div>
+          <div className="text-xs font-normal text-muted-foreground">{user?.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
@@ -230,7 +239,13 @@ function UserMenu() {
           Ayarlar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-danger focus:text-danger">
+        <DropdownMenuItem
+          className="text-danger focus:text-danger"
+          onSelect={(event) => {
+            event.preventDefault();
+            void handleLogout();
+          }}
+        >
           <LogOut className="size-4" />
           Çıkış Yap
         </DropdownMenuItem>
@@ -241,6 +256,7 @@ function UserMenu() {
 
 export function AppShell() {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
@@ -269,12 +285,12 @@ export function AppShell() {
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
             <Avatar className="size-8">
               <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                {initials(currentUser.name)}
+                {initials(user?.name ?? "Kullanici")}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-medium text-foreground">{currentUser.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{currentUser.role}</div>
+              <div className="truncate text-sm font-medium text-foreground">{user?.name}</div>
+              <div className="truncate text-xs text-muted-foreground">{user?.roles[0] ?? ""}</div>
             </div>
           </div>
         </div>

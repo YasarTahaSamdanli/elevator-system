@@ -43,6 +43,20 @@ interface BuildingPayload {
   elevator_count?: number;
 }
 
+export interface BuildingInput {
+  name: string;
+  code: string | null;
+  address: string;
+  city: string;
+  district: string;
+  manager_name: string | null;
+  manager_phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_active: boolean;
+  notes: string | null;
+}
+
 interface ElevatorPayload {
   uuid: string;
   qr_identifier: string;
@@ -203,6 +217,26 @@ async function fetchList<P, T>(
 
 export const fetchBuildings = (params: ListParams = {}) =>
   fetchList<BuildingPayload, Building>("/buildings", params, mapBuilding);
+
+export async function createBuilding(input: BuildingInput): Promise<Building> {
+  const { data } = await api<BuildingPayload>("/buildings", {
+    method: "POST",
+    body: input,
+  });
+  return mapBuilding(data);
+}
+
+export async function updateBuilding(uuid: string, input: BuildingInput): Promise<Building> {
+  const { data } = await api<BuildingPayload>(`/buildings/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapBuilding(data);
+}
+
+export async function deleteBuilding(uuid: string): Promise<void> {
+  await api(`/buildings/${uuid}`, { method: "DELETE" });
+}
 
 export const fetchElevators = (params: ListParams = {}) =>
   fetchList<ElevatorPayload, Elevator>("/elevators", params, mapElevator);

@@ -19,6 +19,8 @@ import { SearchInput } from "@/components/common/SearchInput";
 import { ALL_VALUE, FilterSelect } from "@/components/common/FilterSelect";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ListError } from "@/components/common/ListError";
+import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -36,7 +38,8 @@ import {
 } from "@/lib/status";
 import { formatDateTime, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { workOrders } from "@/mock";
+import { fetchWorkOrders } from "@/api/resources";
+import { useDebounced, useList } from "@/hooks/useList";
 import type {
   WorkOrder,
   WorkOrderPriority,
@@ -293,25 +296,40 @@ export function WorkOrdersPage() {
   const [status, setStatus] = React.useState(ALL_VALUE);
   const [type, setType] = React.useState(ALL_VALUE);
   const [priority, setPriority] = React.useState(ALL_VALUE);
+  const [page, setPage] = React.useState(1);
   const [selected, setSelected] = React.useState<WorkOrder | null>(null);
+  const debouncedQuery = useDebounced(query);
 
-  const filtered = workOrders.filter((wo) => {
-    if (status !== ALL_VALUE && wo.status !== status) return false;
-    if (type !== ALL_VALUE && wo.type !== type) return false;
-    if (priority !== ALL_VALUE && wo.priority !== priority) return false;
-    if (!query) return true;
-    const q = query.toLocaleLowerCase("tr-TR");
-    return [wo.work_order_number, wo.building_name, wo.elevator_name, wo.assigned_user?.name]
-      .filter(Boolean)
-      .some((v) => v!.toLocaleLowerCase("tr-TR").includes(q));
-  });
+  React.useEffect(() => {
+    setPage(1);
+    setSelected(null);
+  }, [debouncedQuery, status, type, priority]);
+
+  const listParams = React.useMemo(
+    () => ({
+      page,
+      perPage: 25,
+      search: debouncedQuery,
+      sort: "-scheduled_at",
+      filter: {
+        ...(status === ALL_VALUE ? {} : { status }),
+        ...(type === ALL_VALUE ? {} : { type }),
+        ...(priority === ALL_VALUE ? {} : { priority }),
+      },
+    }),
+    [page, debouncedQuery, status, type, priority]
+  );
+  const { items: workOrders, pagination, isLoading, error, reload } = useList(
+    fetchWorkOrders,
+    listParams
+  );
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="İş Emirleri"
         description="Bakım, arıza ve muayene işleri"
-        count={workOrders.length}
+        count={pagination?.total ?? workOrders.length}
         actions={
           <Button>
             <Plus />
@@ -341,11 +359,14 @@ export function WorkOrdersPage() {
         />
       </Toolbar>
 
+      {error && <ListError message={error.message} onRetry={reload} />}
+
       <DataTable
         columns={columns}
-        data={filtered}
+        data={workOrders}
         getRowId={(wo) => wo.id}
         onRowClick={setSelected}
+        isLoading={isLoading}
         empty={
           <EmptyState
             icon={ClipboardList}
@@ -354,6 +375,8 @@ export function WorkOrdersPage() {
           />
         }
       />
+
+      <Pagination pagination={pagination} onPageChange={setPage} />
 
       <WorkOrderSheet workOrder={selected} onClose={() => setSelected(null)} />
     </div>

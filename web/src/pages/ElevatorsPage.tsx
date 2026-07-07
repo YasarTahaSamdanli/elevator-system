@@ -6,12 +6,15 @@ import { SearchInput } from "@/components/common/SearchInput";
 import { ALL_VALUE, FilterSelect } from "@/components/common/FilterSelect";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ListError } from "@/components/common/ListError";
+import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { elevatorStatusMeta } from "@/lib/status";
 import { formatNumber } from "@/lib/format";
-import { buildings, elevators } from "@/mock";
+import { fetchBuildings, fetchElevators } from "@/api/resources";
+import { useDebounced, useList } from "@/hooks/useList";
 import type { Elevator, ElevatorStatus } from "@/types";
 
 const columns: Column<Elevator>[] = [
@@ -90,23 +93,39 @@ export function ElevatorsPage() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState(ALL_VALUE);
   const [building, setBuilding] = React.useState(ALL_VALUE);
+  const [page, setPage] = React.useState(1);
+  const debouncedQuery = useDebounced(query);
 
-  const filtered = elevators.filter((e) => {
-    if (status !== ALL_VALUE && e.status !== status) return false;
-    if (building !== ALL_VALUE && e.building_id !== building) return false;
-    if (!query) return true;
-    const q = query.toLocaleLowerCase("tr-TR");
-    return [e.name, e.serial_number, e.qr_identifier, e.building_name, e.manufacturer, e.model]
-      .filter(Boolean)
-      .some((v) => v!.toLocaleLowerCase("tr-TR").includes(q));
-  });
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, status, building]);
+
+  const listParams = React.useMemo(
+    () => ({
+      page,
+      perPage: 25,
+      search: debouncedQuery,
+      sort: "name",
+      filter: {
+        ...(status === ALL_VALUE ? {} : { status }),
+        ...(building === ALL_VALUE ? {} : { building_uuid: building }),
+      },
+    }),
+    [page, debouncedQuery, status, building]
+  );
+  const buildingParams = React.useMemo(() => ({ perPage: 100, sort: "name" }), []);
+  const { items: elevators, pagination, isLoading, error, reload } = useList(
+    fetchElevators,
+    listParams
+  );
+  const { items: buildingOptions } = useList(fetchBuildings, buildingParams);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Asansörler"
         description="Bakım sözleşmeli asansör envanteri"
-        count={elevators.length}
+        count={pagination?.total ?? elevators.length}
         actions={
           <Button>
             <Plus />
@@ -131,14 +150,17 @@ export function ElevatorsPage() {
           value={building}
           onChange={setBuilding}
           allLabel="Tüm Binalar"
-          options={buildings.map((b) => ({ value: b.id, label: b.name }))}
+          options={buildingOptions.map((b) => ({ value: b.id, label: b.name }))}
         />
       </Toolbar>
 
+      {error && <ListError message={error.message} onRetry={reload} />}
+
       <DataTable
         columns={columns}
-        data={filtered}
+        data={elevators}
         getRowId={(e) => e.id}
+        isLoading={isLoading}
         empty={
           <EmptyState
             icon={ArrowUpDown}
@@ -147,6 +169,8 @@ export function ElevatorsPage() {
           />
         }
       />
+
+      <Pagination pagination={pagination} onPageChange={setPage} />
     </div>
   );
 }
