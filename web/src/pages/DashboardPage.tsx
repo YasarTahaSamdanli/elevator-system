@@ -7,8 +7,11 @@ import {
   CheckCircle2,
   ClipboardList,
   FileWarning,
+  PackageCheck,
+  PackageX,
   Play,
   PlusCircle,
+  TrendingDown,
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -33,22 +36,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/providers/ThemeProvider";
 import { getChartPalette, workOrderTypeOrder } from "@/lib/chartColors";
-import { formatNumber, initials, timeAgo } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatNumber, initials, timeAgo } from "@/lib/format";
 import { workOrderPriorityMeta, workOrderStatusMeta } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import {
   fetchDashboardStats,
+  fetchInventoryMovementValue,
+  fetchLowStockMaterials,
   fetchRecentActivity,
+  fetchRecentStockMovements,
+  fetchTopConsumedMaterials,
   fetchTopOpenWorkOrders,
   fetchWorkOrderTypeDistribution,
   fetchWorkOrderVolume,
   type ActivityItem,
   type DashboardStats,
+  type InventoryMovementPoint,
+  type TopConsumedMaterial,
   type TypeDistributionPoint,
   type VolumePoint,
 } from "@/api/dashboard";
-import type { WorkOrder } from "@/types";
+import type { Material, StockMovement, WorkOrder } from "@/types";
 
 /* ---------- shared chart pieces ---------- */
 
@@ -99,6 +108,7 @@ interface StatDef {
   icon: LucideIcon;
   delta?: number;
   positiveIsGood?: boolean;
+  formatter?: (value: number) => string;
 }
 
 function StatTile({ stat }: { stat: StatDef }) {
@@ -111,7 +121,7 @@ function StatTile({ stat }: { stat: StatDef }) {
         <div className="space-y-1.5">
           <div className="text-sm text-muted-foreground">{stat.label}</div>
           <div className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatNumber(stat.value)}
+            {stat.formatter ? stat.formatter(stat.value) : formatNumber(stat.value)}
           </div>
           {hasDelta && (
             <div
@@ -153,6 +163,33 @@ function statsToTiles(stats: DashboardStats): StatDef[] {
       label: "30 Gün İçinde Bitecek Sözleşme",
       value: stats.expiringContracts,
       icon: FileWarning,
+    },
+    {
+      key: "inventory_value",
+      label: "Stok Değeri",
+      value: stats.inventoryValue,
+      icon: PackageCheck,
+      formatter: formatCurrency,
+    },
+    {
+      key: "monthly_consumption",
+      label: "Bu Ay Parça Tüketimi",
+      value: stats.monthlyConsumptionValue,
+      icon: TrendingDown,
+      formatter: formatCurrency,
+    },
+    {
+      key: "low_stock",
+      label: "Minimum Altı Parça",
+      value: stats.lowStockMaterials,
+      icon: PackageX,
+      positiveIsGood: false,
+    },
+    {
+      key: "stock_movements",
+      label: "Stok Hareketi",
+      value: stats.stockMovementCount,
+      icon: ClipboardList,
     },
   ];
 }
@@ -206,6 +243,84 @@ function VolumeChart({ data }: { data: VolumePoint[] }) {
               fill="url(#volume-fill)"
               isAnimationActive={false}
               activeDot={{ r: 4, strokeWidth: 2, stroke: palette.tooltipBg }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InventoryMovementChart({ data }: { data: InventoryMovementPoint[] }) {
+  const { theme } = useTheme();
+  const palette = getChartPalette(theme);
+  const inColor = palette.categorical[1];
+  const outColor = palette.categorical[2];
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle>Stok Giriş / Çıkış Değeri</CardTitle>
+        <p className="text-xs text-muted-foreground">Son 30 gün, hareket fiyatlarıyla</p>
+      </CardHeader>
+      <CardContent className="h-64 pl-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="stock-in-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={inColor} stopOpacity={0.2} />
+                <stop offset="100%" stopColor={inColor} stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="stock-out-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={outColor} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={outColor} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={palette.grid} strokeDasharray="0" vertical={false} />
+            <XAxis
+              dataKey="x"
+              tick={{ fill: palette.axis, fontSize: 11 }}
+              tickFormatter={(v: string) => trShortDay.format(new Date(v))}
+              axisLine={{ stroke: palette.grid }}
+              tickLine={false}
+              minTickGap={32}
+            />
+            <YAxis
+              width={54}
+              tick={{ fill: palette.axis, fontSize: 11 }}
+              tickFormatter={(value: number) => `${Math.round(value / 1000)}K`}
+              axisLine={false}
+              tickLine={false}
+              allowDecimals={false}
+            />
+            <Tooltip
+              formatter={(value: number) => formatCurrency(value)}
+              labelFormatter={(label: string) => trShortDay.format(new Date(label))}
+              contentStyle={{
+                background: palette.tooltipBg,
+                color: palette.tooltipText,
+                border: `1px solid ${palette.tooltipBorder}`,
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="inValue"
+              name="Giriş"
+              stroke={inColor}
+              strokeWidth={2}
+              fill="url(#stock-in-fill)"
+              isAnimationActive={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="outValue"
+              name="Çıkış"
+              stroke={outColor}
+              strokeWidth={2}
+              fill="url(#stock-out-fill)"
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -374,14 +489,156 @@ function RecentActivity({ activity }: { activity: ActivityItem[] }) {
   );
 }
 
+function LowStockMaterials({ materials }: { materials: Material[] }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle>Minimum Stok Altı</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/inventory">
+            Envanter
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-1 p-3 pt-0">
+        {materials.length === 0 ? (
+          <div className="px-2 py-6 text-center text-sm text-muted-foreground">Kritik stok yok.</div>
+        ) : (
+          materials.map((material) => (
+            <Link
+              key={material.id}
+              to="/inventory"
+              className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted"
+            >
+              <PackageX className="size-4 shrink-0 text-danger" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-foreground">{material.name}</div>
+                <div className="font-mono text-xs text-muted-foreground">{material.code}</div>
+              </div>
+              <span className="tabular-nums text-danger-foreground">
+                {formatNumber(material.stock_on_hand)} / {formatNumber(material.min_stock_level)}
+              </span>
+            </Link>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const movementLabel: Record<StockMovement["type"], string> = {
+  purchase_in: "Mal kabul",
+  work_order_out: "İş emri çıkış",
+  work_order_return: "İş emri iade",
+  transfer_in: "Transfer giriş",
+  transfer_out: "Transfer çıkış",
+  adjustment_in: "Sayım (+)",
+  adjustment_out: "Sayım (−)",
+};
+
+function TopConsumedMaterials({ items }: { items: TopConsumedMaterial[] }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle>En Çok Tüketilen Parçalar</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/inventory">
+            Detay
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-1 p-3 pt-0">
+        {items.length === 0 ? (
+          <div className="px-2 py-6 text-center text-sm text-muted-foreground">Henüz tüketim yok.</div>
+        ) : (
+          items.map((item) => (
+            <Link
+              key={item.material.id}
+              to="/inventory"
+              className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted"
+            >
+              <TrendingDown className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-foreground">{item.material.name}</div>
+                <div className="font-mono text-xs text-muted-foreground">{item.material.code}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm tabular-nums text-foreground">{formatCurrency(item.value)}</div>
+                <div className="text-xs tabular-nums text-muted-foreground">
+                  {formatNumber(item.quantity)} {item.material.unit}
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecentStockMovements({ movements }: { movements: StockMovement[] }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle>Son Stok Hareketleri</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/inventory">
+            Defter
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-1 p-3 pt-0">
+        {movements.length === 0 ? (
+          <div className="px-2 py-6 text-center text-sm text-muted-foreground">Henüz hareket yok.</div>
+        ) : (
+          movements.map((movement) => (
+            <Link
+              key={movement.id}
+              to="/inventory"
+              className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted"
+            >
+              <PackageCheck
+                className={cn(
+                  "size-4 shrink-0",
+                  movement.signed_quantity < 0 ? "text-danger" : "text-success"
+                )}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-foreground">{movement.material.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {movementLabel[movement.type]} · {movement.warehouse.name}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={cn("text-sm tabular-nums", movement.signed_quantity < 0 ? "text-danger-foreground" : "text-success")}>
+                  {movement.signed_quantity > 0 ? "+" : ""}
+                  {formatNumber(movement.signed_quantity)}
+                </div>
+                <div className="text-xs text-muted-foreground">{formatDateTime(movement.occurred_at)}</div>
+              </div>
+            </Link>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ---------- page ---------- */
 
 interface DashboardData {
   stats: DashboardStats;
   volume: VolumePoint[];
+  inventoryMovement: InventoryMovementPoint[];
   distribution: TypeDistributionPoint[];
   openWorkOrders: WorkOrder[];
   activity: ActivityItem[];
+  lowStockMaterials: Material[];
+  topConsumedMaterials: TopConsumedMaterial[];
+  recentStockMovements: StockMovement[];
 }
 
 function useDashboardData() {
@@ -398,13 +655,37 @@ function useDashboardData() {
     Promise.all([
       fetchDashboardStats(),
       fetchWorkOrderVolume(),
+      fetchInventoryMovementValue(),
       fetchWorkOrderTypeDistribution(),
       fetchTopOpenWorkOrders(),
       fetchRecentActivity(),
+      fetchLowStockMaterials(),
+      fetchTopConsumedMaterials(),
+      fetchRecentStockMovements(),
     ])
-      .then(([stats, volume, distribution, openWorkOrders, activity]) => {
+      .then(([
+        stats,
+        volume,
+        inventoryMovement,
+        distribution,
+        openWorkOrders,
+        activity,
+        lowStockMaterials,
+        topConsumedMaterials,
+        recentStockMovements,
+      ]) => {
         if (cancelled) return;
-        setData({ stats, volume, distribution, openWorkOrders, activity });
+        setData({
+          stats,
+          volume,
+          inventoryMovement,
+          distribution,
+          openWorkOrders,
+          activity,
+          lowStockMaterials,
+          topConsumedMaterials,
+          recentStockMovements,
+        });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -437,7 +718,7 @@ export function DashboardPage() {
       {isLoading || !data ? (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }, (_, i) => (
+            {Array.from({ length: 8 }, (_, i) => (
               <Skeleton key={i} className="h-24 w-full" />
             ))}
           </div>
@@ -459,8 +740,18 @@ export function DashboardPage() {
             <TypeDonut data={data.distribution} />
           </div>
 
+          <div className="grid gap-4 lg:grid-cols-3">
+            <InventoryMovementChart data={data.inventoryMovement} />
+            <TopConsumedMaterials items={data.topConsumedMaterials} />
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <OpenWorkOrders workOrders={data.openWorkOrders} />
+            <LowStockMaterials materials={data.lowStockMaterials} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <RecentStockMovements movements={data.recentStockMovements} />
             <RecentActivity activity={data.activity} />
           </div>
         </>

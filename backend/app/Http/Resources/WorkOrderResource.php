@@ -43,6 +43,7 @@ class WorkOrderResource extends JsonResource
             'description' => $this->description,
             'notes' => $this->notes,
             'checklist' => WorkOrderChecklistItemResource::collection($this->whenLoaded('checklistItems')),
+            'items' => WorkOrderItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

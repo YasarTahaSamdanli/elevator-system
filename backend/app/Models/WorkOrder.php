@@ -103,6 +103,11 @@ class WorkOrder extends Model
         return $this->hasMany(WorkOrderChecklistItem::class)->orderBy('position');
     }
 
+    public function items(): HasMany
+    {
+        return $this->hasMany(WorkOrderItem::class)->with('material')->orderBy('id');
+    }
+
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');

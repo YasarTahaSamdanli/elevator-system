@@ -31,6 +31,19 @@ export type WorkOrderStatus =
 
 export type WorkOrderPriority = "low" | "normal" | "high" | "critical";
 
+export type MaterialUnit = "piece" | "meter" | "kg" | "liter" | "set";
+
+export type WarehouseType = "main" | "vehicle";
+
+export type StockMovementType =
+  | "purchase_in"
+  | "work_order_out"
+  | "work_order_return"
+  | "transfer_in"
+  | "transfer_out"
+  | "adjustment_in"
+  | "adjustment_out";
+
 export type UserRole =
   | "Super Admin"
   | "Company Owner"
@@ -120,6 +133,15 @@ export interface WorkOrderChecklistItem {
   note: string | null;
 }
 
+export interface WorkOrderItem {
+  id: UUID;
+  material: Pick<Material, "id" | "code" | "name" | "unit">;
+  quantity: number;
+  unit_price: number | null;
+  total_price: number | null;
+  note: string | null;
+}
+
 export interface WorkOrder {
   id: UUID;
   service_contract_id: UUID;
@@ -137,8 +159,45 @@ export interface WorkOrder {
   notes: string | null;
   /** Only present on detail responses (show/store/update). */
   checklist?: WorkOrderChecklistItem[];
+  /** Only present on detail responses (show/store/update). */
+  items?: WorkOrderItem[];
   created_at: ISODateTime;
   updated_at: ISODateTime;
+}
+
+export interface Material {
+  id: UUID;
+  code: string;
+  name: string;
+  unit: MaterialUnit;
+  category: string | null;
+  min_stock_level: number;
+  default_unit_price: number | null;
+  stock_on_hand: number;
+  is_active: boolean;
+  notes: string | null;
+}
+
+export interface Warehouse {
+  id: UUID;
+  name: string;
+  type: WarehouseType;
+  user: Pick<User, "id" | "name"> | null;
+  is_active: boolean;
+}
+
+export interface StockMovement {
+  id: UUID;
+  material: Pick<Material, "id" | "code" | "name" | "unit">;
+  warehouse: Pick<Warehouse, "id" | "name" | "type">;
+  type: StockMovementType;
+  quantity: number;
+  signed_quantity: number;
+  unit_price: number | null;
+  work_order: Pick<WorkOrder, "id" | "work_order_number"> | null;
+  occurred_at: ISODateTime;
+  created_by: Pick<User, "id" | "name"> | null;
+  note: string | null;
 }
 
 export interface AppNotification {

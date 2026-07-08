@@ -5,11 +5,11 @@
  * narrow (perPage=1) requests instead of fetching everything and counting
  * client-side; charts fetch the underlying rows and group them in-browser.
  */
-import { fetchContracts, fetchElevators, fetchWorkOrders } from "@/api/resources";
+import { fetchContracts, fetchElevators, fetchMaterials, fetchStockMovements, fetchWorkOrders } from "@/api/resources";
 import { workOrderTypeOrder } from "@/lib/chartColors";
 import { formatDate } from "@/lib/format";
 import { workOrderTypeMeta } from "@/lib/status";
-import type { AppNotification, WorkOrder, WorkOrderPriority } from "@/types";
+import type { AppNotification, Material, StockMovement, WorkOrder, WorkOrderPriority } from "@/types";
 
 const OPEN_STATUSES = ["draft", "planned", "assigned", "in_progress"];
 
@@ -34,13 +34,17 @@ export interface DashboardStats {
   completedThisMonth: number;
   completedLastMonth: number;
   expiringContracts: number;
+  inventoryValue: number;
+  lowStockMaterials: number;
+  monthlyConsumptionValue: number;
+  stockMovementCount: number;
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   const thisMonth = monthRange(0);
   const lastMonth = monthRange(-1);
 
-  const [activeElevators, openWorkOrders, completedThisMonth, completedLastMonth, expiringContracts] =
+  const [activeElevators, openWorkOrders, completedThisMonth, completedLastMonth, expiringContracts, materials, monthlyOut, stockMovements] =
     await Promise.all([
       fetchElevators({ perPage: 1, filter: { status: "active" } }),
       fetchWorkOrders({ perPage: 1, filter: { status: OPEN_STATUSES } }),
@@ -56,7 +60,22 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
         perPage: 1,
         filter: { status: "active", end_date_from: daysFromToday(0), end_date_to: daysFromToday(30) },
       }),
+      fetchMaterials({ perPage: 100, filter: { is_active: "true" } }),
+      fetchStockMovements({
+        perPage: 100,
+        filter: { type: "work_order_out", occurred_at_from: thisMonth.from, occurred_at_to: thisMonth.to },
+      }),
+      fetchStockMovements({ perPage: 1 }),
     ]);
+
+  const inventoryValue = materials.items.reduce(
+    (sum, material) => sum + material.stock_on_hand * (material.default_unit_price ?? 0),
+    0
+  );
+  const monthlyConsumptionValue = monthlyOut.items.reduce(
+    (sum, movement) => sum + movement.quantity * (movement.unit_price ?? 0),
+    0
+  );
 
   return {
     activeElevators: activeElevators.pagination.total,
@@ -64,6 +83,10 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     completedThisMonth: completedThisMonth.pagination.total,
     completedLastMonth: completedLastMonth.pagination.total,
     expiringContracts: expiringContracts.pagination.total,
+    inventoryValue,
+    lowStockMaterials: materials.items.filter((material) => material.stock_on_hand < material.min_stock_level).length,
+    monthlyConsumptionValue,
+    stockMovementCount: stockMovements.pagination.total,
   };
 }
 
@@ -131,6 +154,80 @@ export async function fetchTopOpenWorkOrders(limit = 5): Promise<WorkOrder[]> {
   return [...items].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]).slice(0, limit);
 }
 
+export async function fetchLowStockMaterials(limit = 5): Promise<Material[]> {
+  const { items } = await fetchMaterials({ perPage: 100, sort: "code", filter: { is_active: "true" } });
+
+  return items
+    .filter((material) => material.stock_on_hand < material.min_stock_level)
+    .slice(0, limit);
+}
+
+export interface InventoryMovementPoint {
+  x: string;
+  inValue: number;
+  outValue: number;
+}
+
+export async function fetchInventoryMovementValue(days = 30): Promise<InventoryMovementPoint[]> {
+  const from = new Date();
+  from.setDate(from.getDate() - (days - 1));
+
+  const { items } = await fetchStockMovements({
+    perPage: 100,
+    sort: "occurred_at",
+    filter: { occurred_at_from: isoDate(from), occurred_at_to: isoDate(new Date()) },
+  });
+
+  const rows = new Map<string, InventoryMovementPoint>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(from);
+    d.setDate(d.getDate() + i);
+    const key = isoDate(d);
+    rows.set(key, { x: key, inValue: 0, outValue: 0 });
+  }
+
+  for (const movement of items) {
+    const day = movement.occurred_at.slice(0, 10);
+    const row = rows.get(day);
+    if (!row) continue;
+    const value = movement.quantity * (movement.unit_price ?? 0);
+    if (movement.signed_quantity >= 0) row.inValue += value;
+    else row.outValue += value;
+  }
+
+  return [...rows.values()];
+}
+
+export interface TopConsumedMaterial {
+  material: StockMovement["material"];
+  quantity: number;
+  value: number;
+}
+
+export async function fetchTopConsumedMaterials(limit = 5, days = 90): Promise<TopConsumedMaterial[]> {
+  const { items } = await fetchStockMovements({
+    perPage: 100,
+    sort: "-occurred_at",
+    filter: { type: "work_order_out", occurred_at_from: daysFromToday(-days) },
+  });
+
+  const totals = new Map<string, TopConsumedMaterial>();
+  for (const movement of items) {
+    const key = movement.material.id;
+    const current = totals.get(key) ?? { material: movement.material, quantity: 0, value: 0 };
+    current.quantity += movement.quantity;
+    current.value += movement.quantity * (movement.unit_price ?? 0);
+    totals.set(key, current);
+  }
+
+  return [...totals.values()].sort((a, b) => b.value - a.value).slice(0, limit);
+}
+
+export async function fetchRecentStockMovements(limit = 6): Promise<StockMovement[]> {
+  const { items } = await fetchStockMovements({ perPage: limit, sort: "-occurred_at" });
+  return items;
+}
+
 export interface ActivityItem {
   id: string;
   message: string;
@@ -179,7 +276,7 @@ export async function fetchRecentActivity(limit = 5): Promise<ActivityItem[]> {
  * state only lives in the browser tab for the session.
  */
 export async function fetchOperationalNotifications(limit = 8): Promise<AppNotification[]> {
-  const [urgent, expiring, down] = await Promise.all([
+  const [urgent, expiring, down, materials] = await Promise.all([
     fetchWorkOrders({
       perPage: 5,
       sort: "scheduled_at",
@@ -195,6 +292,7 @@ export async function fetchOperationalNotifications(limit = 8): Promise<AppNotif
       sort: "-updated_at",
       filter: { status: ["maintenance", "out_of_service"] },
     }),
+    fetchMaterials({ perPage: 100, sort: "code", filter: { is_active: "true" } }),
   ]);
 
   const now = new Date().toISOString();
@@ -224,6 +322,17 @@ export async function fetchOperationalNotifications(limit = 8): Promise<AppNotif
       created_at: now,
       read: false,
     })),
+    ...materials.items
+      .filter((material: Material) => material.stock_on_hand < material.min_stock_level)
+      .slice(0, 5)
+      .map((material) => ({
+        id: `mat-${material.id}`,
+        title: "Minimum stok altı",
+        body: `${material.code} · ${material.name}: ${material.stock_on_hand}/${material.min_stock_level}`,
+        type: "system" as const,
+        created_at: now,
+        read: false,
+      })),
   ];
 
   combined.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));

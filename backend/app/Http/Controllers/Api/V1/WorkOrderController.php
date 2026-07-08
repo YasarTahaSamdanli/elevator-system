@@ -10,9 +10,11 @@ use App\Models\ServiceContract;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Services\WorkOrderChecklistService;
+use App\Services\WorkOrderStockService;
 use App\Support\ApiResponse;
 use App\Support\ListQuery;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -45,7 +47,7 @@ class WorkOrderController extends Controller
     public function show(WorkOrder $workOrder): JsonResponse
     {
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems', 'items'])),
         );
     }
 
@@ -66,13 +68,13 @@ class WorkOrderController extends Controller
         $checklistService->applyTemplate($workOrder);
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
+            data: new WorkOrderResource($workOrder->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems', 'items'])),
             message: 'Work order created successfully.',
             status: 201,
         );
     }
 
-    public function update(UpdateWorkOrderRequest $request, WorkOrder $workOrder): JsonResponse
+    public function update(UpdateWorkOrderRequest $request, WorkOrder $workOrder, WorkOrderStockService $stockService): JsonResponse
     {
         $data = $request->validated();
 
@@ -99,10 +101,21 @@ class WorkOrderController extends Controller
             $data['completed_at'] = now();
         }
 
-        $workOrder->update($data);
+        DB::transaction(function () use ($workOrder, $data, $status, $stockService): void {
+            // Serialize concurrent completion requests on the work order row
+            // so the service's "already issued" check cannot race and deduct
+            // stock twice.
+            WorkOrder::whereKey($workOrder->id)->lockForUpdate()->firstOrFail();
+
+            $workOrder->update($data);
+
+            if ($status === 'completed') {
+                $stockService->issueMaterialsForCompletion($workOrder->fresh());
+            }
+        });
 
         return ApiResponse::success(
-            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems'])),
+            data: new WorkOrderResource($workOrder->fresh()->load(['serviceContract.elevator.building', 'assignedUser', 'checklistItems', 'items'])),
             message: 'Work order updated successfully.',
         );
     }

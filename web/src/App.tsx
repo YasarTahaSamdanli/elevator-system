@@ -7,6 +7,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { BuildingsPage } from "@/pages/BuildingsPage";
 import { ElevatorsPage } from "@/pages/ElevatorsPage";
 import { WorkOrdersPage } from "@/pages/WorkOrdersPage";
+import { InventoryPage } from "@/pages/InventoryPage";
 import { ContractsPage } from "@/pages/ContractsPage";
 import { QrLabelsPage } from "@/pages/QrLabelsPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="/buildings" element={<BuildingsPage />} />
               <Route path="/elevators" element={<ElevatorsPage />} />
               <Route path="/work-orders" element={<WorkOrdersPage />} />
+              <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
               <Route path="/qr-labels" element={<QrLabelsPage />} />
               <Route path="/team" element={<UsersPage />} />

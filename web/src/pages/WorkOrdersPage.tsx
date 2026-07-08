@@ -10,6 +10,7 @@ import {
   Hammer,
   Loader2,
   MoreHorizontal,
+  Package,
   Pencil,
   Play,
   Plus,
@@ -63,12 +64,15 @@ import {
   workOrderStatusMeta,
   workOrderTypeMeta,
 } from "@/lib/status";
-import { formatDateTime, initials } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatNumber, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   createWorkOrder,
+  createWorkOrderItem,
   deleteWorkOrder,
+  deleteWorkOrderItem,
   fetchContracts,
+  fetchMaterials,
   fetchUsers,
   fetchWorkOrder,
   fetchWorkOrders,
@@ -80,6 +84,7 @@ import {
 import { useDebounced, useList } from "@/hooks/useList";
 import { ApiError } from "@/lib/api";
 import type {
+  Material,
   ServiceContract,
   User,
   WorkOrder,
@@ -240,6 +245,14 @@ function WorkOrderSheet({
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [isTransitioning, setTransitioning] = React.useState(false);
   const [confirmingCancel, setConfirmingCancel] = React.useState(false);
+  const [itemMaterialId, setItemMaterialId] = React.useState("");
+  const [itemQuantity, setItemQuantity] = React.useState("1");
+  const [isSavingItem, setSavingItem] = React.useState(false);
+  const materialParams = React.useMemo(
+    () => ({ perPage: 100, sort: "code", filter: { is_active: "true" } }),
+    []
+  );
+  const { items: materials } = useList(fetchMaterials, materialParams);
 
   const workOrderId = workOrder?.id;
 
@@ -267,6 +280,7 @@ function WorkOrderSheet({
   // once loaded (same fields plus the checklist).
   const shown = detail ?? workOrder;
   const checklist = detail?.checklist ?? [];
+  const workOrderItems = detail?.items ?? [];
   const doneCount = checklist.filter((item) => item.is_done).length;
 
   const toggleItem = async (item: WorkOrderChecklistItem) => {
@@ -308,6 +322,45 @@ function WorkOrderSheet({
       setActionError(err instanceof ApiError ? err.message : "Durum güncellenemedi.");
     } finally {
       setTransitioning(false);
+    }
+  };
+
+  const addItem = async () => {
+    if (!detail || !itemMaterialId) return;
+    setSavingItem(true);
+    setActionError(null);
+
+    try {
+      const item = await createWorkOrderItem(detail.id, {
+        material_uuid: itemMaterialId,
+        quantity: Number(itemQuantity),
+        unit_price: null,
+        note: null,
+      });
+      setDetail((prev) => (prev ? { ...prev, items: [...(prev.items ?? []), item] } : prev));
+      setItemMaterialId("");
+      setItemQuantity("1");
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Malzeme satırı eklenemedi.");
+    } finally {
+      setSavingItem(false);
+    }
+  };
+
+  const removeItem = async (itemId: string) => {
+    if (!detail) return;
+    const previous = detail.items ?? [];
+
+    setActionError(null);
+    setDetail((prev) =>
+      prev ? { ...prev, items: previous.filter((item) => item.id !== itemId) } : prev
+    );
+
+    try {
+      await deleteWorkOrderItem(detail.id, itemId);
+    } catch (err) {
+      setDetail((prev) => (prev ? { ...prev, items: previous } : prev));
+      setActionError(err instanceof ApiError ? err.message : "Malzeme satırı silinemedi.");
     }
   };
 
@@ -438,6 +491,80 @@ function WorkOrderSheet({
                   </div>
                 </section>
               )}
+
+              <section className="space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <SectionLabel>Malzemeler</SectionLabel>
+                  {workOrderItems.length > 0 && (
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {formatCurrency(workOrderItems.reduce((sum, item) => sum + (item.total_price ?? 0), 0))}
+                    </span>
+                  )}
+                </div>
+
+                {workOrderItems.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                    Henüz malzeme satırı yok.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border rounded-md border border-border">
+                    {workOrderItems.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <Package className="size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-foreground">
+                            {item.material.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.material.code} · {formatNumber(item.quantity)} {item.material.unit}
+                            {item.unit_price != null ? ` · ${formatCurrency(item.unit_price)}` : ""}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Malzeme satırını sil"
+                          onClick={() => void removeItem(item.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {detail && shown.status !== "completed" && shown.status !== "cancelled" && (
+                  <div className="grid gap-2 sm:grid-cols-[1fr_5rem_auto]">
+                    <Select value={itemMaterialId || undefined} onValueChange={setItemMaterialId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Malzeme seç" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {materials.map((material: Material) => (
+                          <SelectItem key={material.id} value={material.id}>
+                            {material.code} · {material.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={itemQuantity}
+                      onChange={(event) => setItemQuantity(event.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      disabled={isSavingItem || !itemMaterialId}
+                      onClick={() => void addItem()}
+                    >
+                      {isSavingItem ? <Loader2 className="animate-spin" /> : <Plus />}
+                      Ekle
+                    </Button>
+                  </div>
+                )}
+              </section>
 
               {shown.notes && (
                 <section className="space-y-2.5">

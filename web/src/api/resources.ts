@@ -7,9 +7,13 @@ import { api, listQueryString, type ListParams, type PaginationMeta } from "@/li
 import type {
   Building,
   Elevator,
+  Material,
+  MaterialUnit,
   ServiceContract,
+  StockMovement,
   User,
   UserRole,
+  Warehouse,
   WorkOrder,
 } from "@/types";
 
@@ -110,6 +114,8 @@ interface WorkOrderPayload {
   notes: string | null;
   /** Only included on detail responses (show/store/update). */
   checklist?: ChecklistItemPayload[];
+  /** Only included on detail responses (show/store/update). */
+  items?: WorkOrderItemPayload[];
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +127,50 @@ interface UserPayload {
   phone: string | null;
   is_active: boolean;
   roles: string[];
+}
+
+interface MaterialPayload {
+  uuid: string;
+  code: string;
+  name: string;
+  unit: MaterialUnit;
+  category: string | null;
+  min_stock_level: string | number;
+  default_unit_price: string | number | null;
+  stock_on_hand?: string | number;
+  is_active: boolean;
+  notes: string | null;
+}
+
+interface WarehousePayload {
+  uuid: string;
+  name: string;
+  type: Warehouse["type"];
+  user?: { uuid: string | null; name: string | null } | null;
+  is_active: boolean;
+}
+
+interface StockMovementPayload {
+  uuid: string;
+  material: { uuid: string | null; code: string | null; name: string | null; unit: MaterialUnit | null };
+  warehouse: { uuid: string | null; name: string | null; type: Warehouse["type"] | null };
+  type: StockMovement["type"];
+  quantity: string | number;
+  signed_quantity: string | number;
+  unit_price: string | number | null;
+  work_order?: { uuid: string | null; work_order_number: string | null } | null;
+  occurred_at: string;
+  created_by?: { uuid: string | null; name: string | null } | null;
+  note: string | null;
+}
+
+interface WorkOrderItemPayload {
+  uuid: string;
+  material: { uuid: string | null; code: string | null; name: string | null; unit: MaterialUnit | null };
+  quantity: string | number;
+  unit_price: string | number | null;
+  total_price: string | number | null;
+  note: string | null;
 }
 
 /* ---------- mappers ---------- */
@@ -206,8 +256,77 @@ function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
       is_done: item.is_done,
       note: item.note,
     })),
+    items: p.items?.map(mapWorkOrderItem),
     created_at: p.created_at,
     updated_at: p.updated_at,
+  };
+}
+
+function mapMaterial(p: MaterialPayload): Material {
+  return {
+    id: p.uuid,
+    code: p.code,
+    name: p.name,
+    unit: p.unit,
+    category: p.category,
+    min_stock_level: Number(p.min_stock_level),
+    default_unit_price: num(p.default_unit_price),
+    stock_on_hand: Number(p.stock_on_hand ?? 0),
+    is_active: p.is_active,
+    notes: p.notes,
+  };
+}
+
+function mapWarehouse(p: WarehousePayload): Warehouse {
+  return {
+    id: p.uuid,
+    name: p.name,
+    type: p.type,
+    user: p.user?.uuid ? { id: p.user.uuid, name: p.user.name ?? "—" } : null,
+    is_active: p.is_active,
+  };
+}
+
+function mapStockMovement(p: StockMovementPayload): StockMovement {
+  return {
+    id: p.uuid,
+    material: {
+      id: p.material.uuid ?? "",
+      code: p.material.code ?? "",
+      name: p.material.name ?? "—",
+      unit: p.material.unit ?? "piece",
+    },
+    warehouse: {
+      id: p.warehouse.uuid ?? "",
+      name: p.warehouse.name ?? "—",
+      type: p.warehouse.type ?? "main",
+    },
+    type: p.type,
+    quantity: Number(p.quantity),
+    signed_quantity: Number(p.signed_quantity),
+    unit_price: num(p.unit_price),
+    work_order: p.work_order?.uuid
+      ? { id: p.work_order.uuid, work_order_number: p.work_order.work_order_number ?? "—" }
+      : null,
+    occurred_at: p.occurred_at,
+    created_by: p.created_by?.uuid ? { id: p.created_by.uuid, name: p.created_by.name ?? "—" } : null,
+    note: p.note,
+  };
+}
+
+function mapWorkOrderItem(p: WorkOrderItemPayload): NonNullable<WorkOrder["items"]>[number] {
+  return {
+    id: p.uuid,
+    material: {
+      id: p.material.uuid ?? "",
+      code: p.material.code ?? "",
+      name: p.material.name ?? "—",
+      unit: p.material.unit ?? "piece",
+    },
+    quantity: Number(p.quantity),
+    unit_price: num(p.unit_price),
+    total_price: num(p.total_price),
+    note: p.note,
   };
 }
 
@@ -363,6 +482,28 @@ export async function updateWorkOrderChecklistItem(
   });
 }
 
+export interface WorkOrderItemInput {
+  material_uuid: string;
+  quantity: number;
+  unit_price: number | null;
+  note: string | null;
+}
+
+export async function createWorkOrderItem(
+  workOrderUuid: string,
+  input: WorkOrderItemInput
+): Promise<NonNullable<WorkOrder["items"]>[number]> {
+  const { data } = await api<WorkOrderItemPayload>(`/work-orders/${workOrderUuid}/items`, {
+    method: "POST",
+    body: input,
+  });
+  return mapWorkOrderItem(data);
+}
+
+export async function deleteWorkOrderItem(workOrderUuid: string, itemUuid: string): Promise<void> {
+  await api(`/work-orders/${workOrderUuid}/items/${itemUuid}`, { method: "DELETE" });
+}
+
 export interface WorkOrderInput {
   service_contract_uuid: string;
   type: WorkOrder["type"];
@@ -394,6 +535,105 @@ export async function updateWorkOrder(uuid: string, input: WorkOrderInput): Prom
 
 export async function deleteWorkOrder(uuid: string): Promise<void> {
   await api(`/work-orders/${uuid}`, { method: "DELETE" });
+}
+
+export const fetchMaterials = (params: ListParams = {}) =>
+  fetchList<MaterialPayload, Material>("/materials", params, mapMaterial);
+
+export interface MaterialInput {
+  code: string;
+  name: string;
+  unit: MaterialUnit;
+  category: string | null;
+  min_stock_level: number;
+  default_unit_price: number | null;
+  is_active: boolean;
+  notes: string | null;
+}
+
+export async function createMaterial(input: MaterialInput): Promise<Material> {
+  const { data } = await api<MaterialPayload>("/materials", {
+    method: "POST",
+    body: input,
+  });
+  return mapMaterial(data);
+}
+
+export async function updateMaterial(uuid: string, input: MaterialInput): Promise<Material> {
+  const { data } = await api<MaterialPayload>(`/materials/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapMaterial(data);
+}
+
+export async function deleteMaterial(uuid: string): Promise<void> {
+  await api(`/materials/${uuid}`, { method: "DELETE" });
+}
+
+export const fetchWarehouses = (params: ListParams = {}) =>
+  fetchList<WarehousePayload, Warehouse>("/warehouses", params, mapWarehouse);
+
+export interface WarehouseInput {
+  name: string;
+  type: Warehouse["type"];
+  user_uuid: string | null;
+  is_active: boolean;
+}
+
+export async function createWarehouse(input: WarehouseInput): Promise<Warehouse> {
+  const { data } = await api<WarehousePayload>("/warehouses", {
+    method: "POST",
+    body: input,
+  });
+  return mapWarehouse(data);
+}
+
+export async function updateWarehouse(uuid: string, input: WarehouseInput): Promise<Warehouse> {
+  const { data } = await api<WarehousePayload>(`/warehouses/${uuid}`, {
+    method: "PUT",
+    body: input,
+  });
+  return mapWarehouse(data);
+}
+
+export const fetchStockMovements = (params: ListParams = {}) =>
+  fetchList<StockMovementPayload, StockMovement>("/stock-movements", params, mapStockMovement);
+
+export interface StockMovementInput {
+  material_uuid: string;
+  warehouse_uuid: string;
+  type: StockMovement["type"];
+  quantity: number;
+  unit_price: number | null;
+  occurred_at: string | null;
+  note: string | null;
+  update_material_price?: boolean;
+}
+
+export async function createStockMovement(input: StockMovementInput): Promise<StockMovement> {
+  const { data } = await api<StockMovementPayload>("/stock-movements", {
+    method: "POST",
+    body: input,
+  });
+  return mapStockMovement(data);
+}
+
+export interface StockTransferInput {
+  material_uuid: string;
+  from_warehouse_uuid: string;
+  to_warehouse_uuid: string;
+  quantity: number;
+  occurred_at?: string | null;
+  note: string | null;
+}
+
+export async function createStockTransfer(input: StockTransferInput): Promise<StockMovement[]> {
+  const { data } = await api<StockMovementPayload[]>("/stock-movements/transfers", {
+    method: "POST",
+    body: input,
+  });
+  return data.map(mapStockMovement);
 }
 
 export const fetchUsers = (params: ListParams = {}) =>
