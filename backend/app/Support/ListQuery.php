@@ -28,7 +28,7 @@ class ListQuery
     /** @var list<string> columns exposed as filter[col_from] / filter[col_to] */
     private array $dateRanges = [];
 
-    /** @var list<string> */
+    /** @var array<int|string, string|list<string>> */
     private array $searchable = [];
 
     /** @var list<string> */
@@ -83,9 +83,9 @@ class ListQuery
     }
 
     /**
-     * Columns matched (case-insensitively, partial) by the `search` parameter.
+     * Columns and relation columns matched (case-insensitively, partial) by the `search` parameter.
      *
-     * @param  list<string>  $columns
+     * @param  array<int|string, string|list<string>>  $columns
      */
     public function searchable(array $columns): self
     {
@@ -199,9 +199,26 @@ class ListQuery
         $needle = '%'.mb_strtolower(trim($term)).'%';
 
         $this->query->where(function (Builder $query) use ($needle): void {
-            foreach ($this->searchable as $column) {
+            foreach ($this->searchable as $key => $columns) {
+                if (is_string($key) && is_array($columns)) {
+                    $query->orWhereHas($key, function (Builder $relation) use ($columns, $needle): void {
+                        $relation->where(function (Builder $relatedQuery) use ($columns, $needle): void {
+                            foreach ($columns as $column) {
+                                $relatedQuery->orWhereRaw(
+                                    'LOWER(CAST('.$relatedQuery->qualifyColumn($column).' AS TEXT)) LIKE ?',
+                                    [$needle],
+                                );
+                            }
+                        });
+                    });
+
+                    continue;
+                }
+
+                $column = is_array($columns) ? (string) $key : $columns;
+
                 $query->orWhereRaw(
-                    'LOWER('.$query->qualifyColumn($column).') LIKE ?',
+                    'LOWER(CAST('.$query->qualifyColumn($column).' AS TEXT)) LIKE ?',
                     [$needle],
                 );
             }

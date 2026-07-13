@@ -34,7 +34,13 @@ class StockMovementController extends Controller
                     fn (Builder $warehouse) => $warehouse->where('uuid', $value),
                 ),
             ])
-            ->searchable(['note'])
+            ->searchable([
+                'note',
+                'material' => ['code', 'name', 'category', 'unit'],
+                'warehouse' => ['name', 'type'],
+                'workOrder' => ['work_order_number', 'description', 'notes'],
+                'creator' => ['name', 'email', 'phone'],
+            ])
             ->sortable(['type', 'quantity', 'unit_price', 'occurred_at', 'created_at'])
             ->dateRange('occurred_at', 'created_at')
             ->paginate();

@@ -1,0 +1,4 @@
+requests
+pypdfium2
+pillow
+pywin32

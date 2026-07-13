@@ -211,6 +211,68 @@ class ApiListQueryTest extends TestCase
             ->assertJsonPath('data.0.name', 'Nurol Tower');
     }
 
+    public function test_work_order_search_matches_related_building_and_elevator_context(): void
+    {
+        $gunesBuilding = Building::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Gunes Apartmani',
+        ]);
+        $gunesElevator = Elevator::factory()->create([
+            'building_id' => $gunesBuilding->id,
+            'serial_number' => 'ELV-GUNES-01',
+        ]);
+        WorkOrder::factory()->create([
+            'service_contract_id' => \App\Models\ServiceContract::factory()
+                ->create(['elevator_id' => $gunesElevator->id])->id,
+            'description' => 'Rutin bakim',
+        ]);
+
+        $otherBuilding = Building::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Poyraz Apartmani',
+        ]);
+        $otherElevator = Elevator::factory()->create(['building_id' => $otherBuilding->id]);
+        WorkOrder::factory()->create([
+            'service_contract_id' => \App\Models\ServiceContract::factory()
+                ->create(['elevator_id' => $otherElevator->id])->id,
+            'description' => 'Rutin bakim',
+        ]);
+
+        $byBuilding = $this->actingAs($this->user)->getJson('/api/v1/work-orders?search=gunes');
+        $byBuilding
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.building.name', 'Gunes Apartmani');
+
+        $byElevator = $this->actingAs($this->user)->getJson('/api/v1/work-orders?search=ELV-GUNES');
+        $byElevator
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.elevator.serial_number', 'ELV-GUNES-01');
+    }
+
+    public function test_elevator_search_matches_related_building_context(): void
+    {
+        $building = Building::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Gunes Sitesi',
+        ]);
+        Elevator::factory()->create(['building_id' => $building->id, 'serial_number' => 'ELV-1001']);
+
+        $otherBuilding = Building::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Ay Sitesi',
+        ]);
+        Elevator::factory()->create(['building_id' => $otherBuilding->id, 'serial_number' => 'ELV-2002']);
+
+        $response = $this->actingAs($this->user)->getJson('/api/v1/elevators?search=gunes');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.building.name', 'Gunes Sitesi');
+    }
+
     public function test_filters_never_leak_other_companies_data(): void
     {
         $otherCompany = Company::factory()->create();

@@ -37,6 +37,32 @@ class ElevatorControllerTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_elevators_can_be_resolved_by_exact_qr_identifier(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $building = Building::factory()->create(['company_id' => $company->id]);
+        $elevator = Elevator::factory()->create(['building_id' => $building->id]);
+        Elevator::factory()->create(['building_id' => $building->id]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/elevators?filter[qr_identifier]='.$elevator->qr_identifier)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.uuid', $elevator->uuid);
+    }
+
+    public function test_qr_identifier_filter_does_not_resolve_other_companys_elevators(): void
+    {
+        $user = User::factory()->create();
+        $otherElevator = Elevator::factory()->create();
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/elevators?filter[qr_identifier]='.$otherElevator->qr_identifier)
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
     public function test_authenticated_user_can_view_a_single_elevator(): void
     {
         $company = Company::factory()->create();

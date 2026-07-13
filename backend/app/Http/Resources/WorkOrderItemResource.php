@@ -22,6 +22,8 @@ class WorkOrderItemResource extends JsonResource
             'quantity' => $this->quantity,
             'unit_price' => $this->unit_price,
             'total_price' => $this->unit_price === null ? null : (string) ((float) $this->quantity * (float) $this->unit_price),
+            'sale_unit_price' => $this->sale_unit_price,
+            'sale_total_price' => $this->sale_unit_price === null ? null : (string) ((float) $this->quantity * (float) $this->sale_unit_price),
             'note' => $this->note,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

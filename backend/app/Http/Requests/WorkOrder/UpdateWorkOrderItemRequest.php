@@ -16,6 +16,7 @@ class UpdateWorkOrderItemRequest extends FormRequest
         return [
             'quantity' => ['sometimes', 'required', 'numeric', 'gt:0'],
             'unit_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sale_unit_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'note' => ['sometimes', 'nullable', 'string'],
         ];
     }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Loader2, MoreHorizontal, Pencil, Plus, Trash2, Users as UsersIcon } from "lucide-react";
+import { Loader2, Plus, Users as UsersIcon } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Toolbar } from "@/components/common/Toolbar";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -9,6 +9,9 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListError } from "@/components/common/ListError";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Field, FormErrorBanner } from "@/components/common/Field";
+import { ConfirmDeleteDialog, useConfirmDelete } from "@/components/common/ConfirmDeleteDialog";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,12 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -35,10 +32,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { initials } from "@/lib/format";
+import { blankToNull, fieldError } from "@/lib/forms";
 import { createUser, deleteUser, fetchUsers, updateUser, type UserInput } from "@/api/resources";
 import { useAuth } from "@/providers/AuthProvider";
 import { useDebounced, useList } from "@/hooks/useList";
-import { ApiError } from "@/lib/api";
+import { useFormDialog } from "@/hooks/useFormDialog";
 import type { User, UserRole } from "@/types";
 
 const activeMeta = { label: "Aktif", variant: "success", dot: "bg-success" } as const;
@@ -115,11 +113,6 @@ const emptyForm: UserFormValues = {
   is_active: "true",
 };
 
-const blankToNull = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-};
-
 function formFromUser(user: User | null): UserFormValues {
   if (!user) return emptyForm;
 
@@ -142,28 +135,6 @@ function formToInput(values: UserFormValues): UserInput {
     role: values.role,
     is_active: values.is_active === "true",
   };
-}
-
-function fieldError(errors: Record<string, string[]>, field: keyof UserFormValues) {
-  return errors[field]?.[0] ?? null;
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
-    </label>
-  );
 }
 
 function UserFormDialog({
@@ -215,11 +186,7 @@ function UserFormDialog({
             void onSubmit(values);
           }}
         >
-          {formError && (
-            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
-              {formError}
-            </div>
-          )}
+          <FormErrorBanner message={formError} />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Ad Soyad" error={fieldError(errors, "name")}>
@@ -313,25 +280,13 @@ export function UsersPage() {
   const [query, setQuery] = React.useState("");
   const [role, setRole] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<User | null>(null);
-  const [deletingUser, setDeletingUser] = React.useState<User | null>(null);
-  const [formErrors, setFormErrors] = React.useState<Record<string, string[]>>({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = React.useState(false);
-  const [isDeleting, setDeleting] = React.useState(false);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const form = useFormDialog<User>();
+  const del = useConfirmDelete<User>();
   const debouncedQuery = useDebounced(query);
 
   React.useEffect(() => {
     setPage(1);
   }, [debouncedQuery, role]);
-
-  const listFilter = React.useMemo<Record<string, string>>(() => {
-    const filter: Record<string, string> = {};
-    if (role !== ALL_VALUE) filter.role = role;
-    return filter;
-  }, [role]);
 
   const listParams = React.useMemo(
     () => ({
@@ -339,68 +294,22 @@ export function UsersPage() {
       perPage: 25,
       search: debouncedQuery,
       sort: "name",
-      filter: listFilter,
+      filter: { ...(role === ALL_VALUE ? {} : { role }) },
     }),
-    [page, debouncedQuery, listFilter]
+    [page, debouncedQuery, role]
   );
   const { items: users, pagination, isLoading, error, reload } = useList(fetchUsers, listParams);
 
-  const openCreate = () => {
-    setEditingUser(null);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const openEdit = (user: User) => {
-    setEditingUser(user);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (values: UserFormValues) => {
-    setSubmitting(true);
-    setFormErrors({});
-    setFormError(null);
-
-    try {
+  const handleSubmit = (values: UserFormValues) =>
+    form.submit(async () => {
       const input = formToInput(values);
-      if (editingUser) {
-        await updateUser(editingUser.id, input);
+      if (form.editing) {
+        await updateUser(form.editing.id, input);
       } else {
         await createUser({ ...input, password: values.password.trim() });
       }
-      setFormOpen(false);
-      setEditingUser(null);
       reload();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFormErrors(err.details);
-        setFormError(err.message);
-      } else {
-        setFormError("Beklenmeyen bir hata oluştu.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deletingUser) return;
-    setDeleting(true);
-    setDeleteError(null);
-
-    try {
-      await deleteUser(deletingUser.id);
-      setDeletingUser(null);
-      reload();
-    } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "Beklenmeyen bir hata oluştu.");
-    } finally {
-      setDeleting(false);
-    }
-  };
+    });
 
   return (
     <div className="space-y-5">
@@ -409,7 +318,7 @@ export function UsersPage() {
         description="Şirket kullanıcıları ve saha teknisyenleri"
         count={pagination?.total ?? users.length}
         actions={
-          <Button onClick={openCreate}>
+          <Button onClick={form.openCreate}>
             <Plus />
             Yeni Kullanıcı
           </Button>
@@ -434,31 +343,11 @@ export function UsersPage() {
         getRowId={(u) => u.id}
         isLoading={isLoading}
         rowActions={(user) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Kullanıcı işlemleri">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openEdit(user)}>
-                <Pencil className="size-4" />
-                Düzenle
-              </DropdownMenuItem>
-              {currentUser?.uuid !== user.id && (
-                <DropdownMenuItem
-                  className="text-danger focus:text-danger"
-                  onSelect={() => {
-                    setDeleteError(null);
-                    setDeletingUser(user);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                  Sil
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            ariaLabel="Kullanıcı işlemleri"
+            onEdit={() => form.openEdit(user)}
+            onDelete={currentUser?.uuid !== user.id ? () => del.request(user) : undefined}
+          />
         )}
         empty={
           <EmptyState
@@ -472,42 +361,30 @@ export function UsersPage() {
       <Pagination pagination={pagination} onPageChange={setPage} />
 
       <UserFormDialog
-        open={formOpen}
-        user={editingUser}
-        errors={formErrors}
-        formError={formError}
-        isSubmitting={isSubmitting}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditingUser(null);
-        }}
+        open={form.open}
+        user={form.editing}
+        errors={form.errors}
+        formError={form.formError}
+        isSubmitting={form.isSubmitting}
+        onOpenChange={form.onOpenChange}
         onSubmit={handleSubmit}
       />
 
-      <Dialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Kullanıcıyı Sil</DialogTitle>
-            <DialogDescription>
-              {deletingUser?.name} kaydı silinecek. Bu işlem kullanıcının erişimini hemen kapatır.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteError && (
-            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
-              {deleteError}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" disabled={isDeleting} onClick={() => setDeletingUser(null)}>
-              Vazgeç
-            </Button>
-            <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
-              {isDeleting && <Loader2 className="animate-spin" />}
-              Sil
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        open={!!del.target}
+        title="Kullanıcıyı Sil"
+        description={`${del.target?.name ?? ""} kaydı silinecek. Bu işlem kullanıcının erişimini hemen kapatır.`}
+        error={del.error}
+        isDeleting={del.isDeleting}
+        onClose={del.close}
+        onConfirm={() =>
+          void del.confirm(async () => {
+            if (!del.target) return;
+            await deleteUser(del.target.id);
+            reload();
+          })
+        }
+      />
     </div>
   );
 }

@@ -27,6 +27,7 @@ class Material extends Model
         'category',
         'min_stock_level',
         'default_unit_price',
+        'default_sale_price',
         'is_active',
         'notes',
     ];
@@ -56,6 +57,7 @@ class Material extends Model
         return [
             'min_stock_level' => 'decimal:3',
             'default_unit_price' => 'decimal:2',
+            'default_sale_price' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }

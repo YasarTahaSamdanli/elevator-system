@@ -19,10 +19,15 @@ class StoreWorkOrderItemRequest extends FormRequest
             'material_uuid' => [
                 'required',
                 'string',
-                Rule::exists('materials', 'uuid')->where(fn ($query) => $query->where('company_id', Auth::user()?->company_id)),
+                Rule::exists('materials', 'uuid')->where(
+                    fn ($query) => $query
+                        ->where('company_id', Auth::user()?->company_id)
+                        ->where('is_active', true)
+                ),
             ],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
+            'sale_unit_price' => ['nullable', 'numeric', 'min:0'],
             'note' => ['nullable', 'string'],
         ];
     }

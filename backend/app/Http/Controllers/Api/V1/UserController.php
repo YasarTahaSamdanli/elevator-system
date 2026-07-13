@@ -27,7 +27,7 @@ class UserController extends Controller
                         : $role->where('name', $value),
                 ),
             ])
-            ->searchable(['name', 'email', 'phone'])
+            ->searchable(['name', 'email', 'phone', 'roles' => ['name']])
             ->sortable(['name', 'email', 'is_active', 'created_at', 'updated_at'])
             ->dateRange('created_at')
             ->paginate();

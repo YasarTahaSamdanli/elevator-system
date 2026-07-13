@@ -72,6 +72,11 @@ class Elevator extends Model
         return $this->hasMany(ServiceContract::class);
     }
 
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(ElevatorInspection::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -84,6 +89,9 @@ class Elevator extends Model
             'capacity_kg' => 'integer',
             'person_capacity' => 'integer',
             'stop_count' => 'integer',
+            'last_inspection_at' => 'date',
+            'next_inspection_due' => 'date',
+            'follow_up_due' => 'date',
         ];
     }
 }

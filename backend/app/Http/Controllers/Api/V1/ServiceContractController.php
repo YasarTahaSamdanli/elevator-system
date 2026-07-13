@@ -26,7 +26,12 @@ class ServiceContractController extends Controller
                     fn (Builder $elevator) => $elevator->where('uuid', $value),
                 ),
             ])
-            ->searchable(['contract_number'])
+            ->searchable([
+                'contract_number',
+                'notes',
+                'elevator' => ['serial_number', 'qr_identifier', 'name', 'manufacturer', 'model', 'registration_number'],
+                'elevator.building' => ['name', 'code', 'address', 'city', 'district', 'manager_name', 'manager_phone'],
+            ])
             ->sortable(['contract_number', 'start_date', 'end_date', 'monthly_fee', 'status', 'created_at', 'updated_at'])
             ->dateRange('start_date', 'end_date', 'created_at')
             ->paginate();

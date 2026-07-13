@@ -25,6 +25,7 @@ class WorkOrderItem extends Model
         'material_id',
         'quantity',
         'unit_price',
+        'sale_unit_price',
         'note',
     ];
 
@@ -53,6 +54,7 @@ class WorkOrderItem extends Model
         return [
             'quantity' => 'decimal:3',
             'unit_price' => 'decimal:2',
+            'sale_unit_price' => 'decimal:2',
         ];
     }
 

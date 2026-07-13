@@ -26,6 +26,7 @@ class WorkOrderItemController extends Controller
             'material_id' => $material->id,
             'quantity' => $data['quantity'],
             'unit_price' => array_key_exists('unit_price', $data) ? $data['unit_price'] : $material->default_unit_price,
+            'sale_unit_price' => array_key_exists('sale_unit_price', $data) ? $data['sale_unit_price'] : $material->default_sale_price,
             'note' => $data['note'] ?? null,
         ]);
 

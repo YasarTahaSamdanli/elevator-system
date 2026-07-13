@@ -34,6 +34,7 @@ class UpdateMaterialRequest extends FormRequest
             'category' => ['sometimes', 'nullable', 'string', 'max:100'],
             'min_stock_level' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'default_unit_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'default_sale_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['sometimes', 'nullable', 'string'],
         ];

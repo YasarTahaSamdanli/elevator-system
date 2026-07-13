@@ -18,7 +18,7 @@ class BuildingController extends Controller
     {
         $buildings = ListQuery::for(Building::query()->withCount('elevators'), $request)
             ->filterable(['city', 'district', 'is_active'])
-            ->searchable(['name', 'code', 'city', 'district', 'manager_name'])
+            ->searchable(['name', 'code', 'address', 'city', 'district', 'manager_name', 'manager_phone', 'notes'])
             ->sortable(['name', 'code', 'city', 'district', 'created_at', 'updated_at'])
             ->dateRange('created_at')
             ->paginate();

@@ -39,6 +39,18 @@ class StoreWorkOrderRequest extends FormRequest
             ],
             'description' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'items' => ['sometimes', 'array'],
+            'items.*.material_uuid' => [
+                'required_with:items',
+                'uuid',
+                Rule::exists('materials', 'uuid')
+                    ->where('company_id', Auth::user()?->company_id)
+                    ->where('is_active', true),
+            ],
+            'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.sale_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.note' => ['nullable', 'string'],
         ];
     }
 }

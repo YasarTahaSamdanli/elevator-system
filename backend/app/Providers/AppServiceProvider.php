@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\InspectionImport\ImapMailFetcher;
+use App\Services\InspectionImport\MailFetcherInterface;
+use App\Services\InspectionImport\PdfTextExtractorInterface;
+use App\Services\InspectionImport\SmalotPdfTextExtractor;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +18,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(PdfTextExtractorInterface::class, SmalotPdfTextExtractor::class);
+        $this->app->bind(MailFetcherInterface::class, ImapMailFetcher::class);
     }
 
     /**

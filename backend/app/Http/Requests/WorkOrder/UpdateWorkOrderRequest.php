@@ -42,6 +42,19 @@ class UpdateWorkOrderRequest extends FormRequest
             ],
             'description' => ['sometimes', 'nullable', 'string'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'qr_identifier' => ['sometimes', 'string'],
+            'items' => ['sometimes', 'array'],
+            'items.*.material_uuid' => [
+                'required_with:items',
+                'uuid',
+                Rule::exists('materials', 'uuid')
+                    ->where('company_id', Auth::user()?->company_id)
+                    ->where('is_active', true),
+            ],
+            'items.*.quantity' => ['required_with:items', 'numeric', 'gt:0'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.sale_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.note' => ['nullable', 'string'],
         ];
     }
 
@@ -66,7 +79,50 @@ class UpdateWorkOrderRequest extends FormRequest
                     'status',
                     "Work order status cannot change from '{$workOrder->status}' to '{$status}'.",
                 );
+
+                return;
             }
+
+            $this->validateElevatorQr($validator, $workOrder, $status);
         });
+    }
+
+    /**
+     * Technicians must prove presence at the elevator: starting a work
+     * order requires scanning the elevator's QR label. Office/manager
+     * accounts stay exempt so the back office can intervene when a label
+     * is damaged or missing.
+     */
+    private function validateElevatorQr(Validator $validator, WorkOrder $workOrder, string $status): void
+    {
+        if ($status !== 'in_progress' || $workOrder->status === 'in_progress') {
+            return;
+        }
+
+        $user = Auth::user();
+
+        if ($user === null || ! $user->hasRole('Technician')) {
+            return;
+        }
+
+        $qrIdentifier = $this->input('qr_identifier');
+
+        if (! is_string($qrIdentifier) || $qrIdentifier === '') {
+            $validator->errors()->add(
+                'qr_identifier',
+                'Starting this work order requires scanning the elevator QR code.',
+            );
+
+            return;
+        }
+
+        $expected = $workOrder->serviceContract?->elevator?->qr_identifier;
+
+        if ($expected === null || ! hash_equals($expected, $qrIdentifier)) {
+            $validator->errors()->add(
+                'qr_identifier',
+                "The scanned QR code does not belong to this work order's elevator.",
+            );
+        }
     }
 }

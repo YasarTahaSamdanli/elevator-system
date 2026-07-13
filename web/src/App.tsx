@@ -6,8 +6,11 @@ import { AppShell } from "@/layouts/AppShell";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { BuildingsPage } from "@/pages/BuildingsPage";
 import { ElevatorsPage } from "@/pages/ElevatorsPage";
-import { WorkOrdersPage } from "@/pages/WorkOrdersPage";
+import { WorkOrdersPage } from "@/pages/work-orders/WorkOrdersPage";
+import { InspectionsPage } from "@/pages/InspectionsPage";
+import { InspectionImportsPage } from "@/pages/InspectionImportsPage";
 import { InventoryPage } from "@/pages/InventoryPage";
+import { LedgerPage } from "@/pages/LedgerPage";
 import { ContractsPage } from "@/pages/ContractsPage";
 import { QrLabelsPage } from "@/pages/QrLabelsPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -33,7 +36,10 @@ export default function App() {
               <Route path="/buildings" element={<BuildingsPage />} />
               <Route path="/elevators" element={<ElevatorsPage />} />
               <Route path="/work-orders" element={<WorkOrdersPage />} />
+              <Route path="/inspections" element={<InspectionsPage />} />
+              <Route path="/inspection-imports" element={<InspectionImportsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/ledger" element={<LedgerPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
               <Route path="/qr-labels" element={<QrLabelsPage />} />
               <Route path="/team" element={<UsersPage />} />

@@ -19,7 +19,7 @@ class WarehouseController extends Controller
     {
         $warehouses = ListQuery::for(Warehouse::query()->with('user'), $request)
             ->filterable(['type', 'is_active'])
-            ->searchable(['name'])
+            ->searchable(['name', 'type', 'user' => ['name', 'email', 'phone']])
             ->sortable(['name', 'type', 'created_at', 'updated_at'])
             ->dateRange('created_at')
             ->paginate();

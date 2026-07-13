@@ -99,6 +99,7 @@ export async function api<T>(
   options: { method?: string; body?: unknown } = {}
 ): Promise<Envelope<T>> {
   const token = getToken();
+  const isFormData = options.body instanceof FormData;
 
   let response: Response;
   try {
@@ -106,10 +107,16 @@ export async function api<T>(
       method: options.method ?? "GET",
       headers: {
         Accept: "application/json",
-        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(options.body !== undefined && !isFormData
+          ? { "Content-Type": "application/json" }
+          : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: isFormData
+        ? (options.body as FormData)
+        : options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
     });
   } catch {
     throw new ApiError("Sunucuya ulaşılamıyor.", "NETWORK_ERROR", 0);
@@ -145,4 +152,29 @@ export async function api<T>(
   }
 
   return { data: body.data as T, message: body.message ?? "", meta: body.meta };
+}
+
+/** Fetch a binary endpoint (e.g. a stored report PDF) with the auth header. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const token = getToken();
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    throw new ApiError("Sunucuya ulaşılamıyor.", "NETWORK_ERROR", 0);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+
+    throw new ApiError("Dosya indirilemedi.", "DOWNLOAD_ERROR", response.status);
+  }
+
+  return response.blob();
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Building2, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Building2, Loader2, MapPin, Plus } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Toolbar } from "@/components/common/Toolbar";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -10,6 +10,9 @@ import { ListError } from "@/components/common/ListError";
 import { LocationPicker } from "@/components/common/LocationPicker";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Field, FormErrorBanner } from "@/components/common/Field";
+import { ConfirmDeleteDialog, useConfirmDelete } from "@/components/common/ConfirmDeleteDialog";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Button } from "@/components/ui/button";
 import {
   createBuilding,
@@ -26,13 +29,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -41,7 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDebounced, useList } from "@/hooks/useList";
-import { ApiError } from "@/lib/api";
+import { useFormDialog } from "@/hooks/useFormDialog";
+import { blankToNull, fieldError, numericOrNull } from "@/lib/forms";
 import type { Building } from "@/types";
 
 const activeMeta = { label: "Aktif", variant: "success", dot: "bg-success" } as const;
@@ -134,16 +133,6 @@ const emptyForm: BuildingFormValues = {
   notes: "",
 };
 
-const blankToNull = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-};
-
-const numericOrNull = (value: string): number | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : Number(trimmed);
-};
-
 function formFromBuilding(building: Building | null): BuildingFormValues {
   if (!building) return emptyForm;
 
@@ -176,28 +165,6 @@ function formToInput(values: BuildingFormValues): BuildingInput {
     is_active: values.is_active === "true",
     notes: blankToNull(values.notes),
   };
-}
-
-function fieldError(errors: Record<string, string[]>, field: keyof BuildingFormValues) {
-  return errors[field]?.[0] ?? null;
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
-    </label>
-  );
 }
 
 function BuildingFormDialog({
@@ -249,11 +216,7 @@ function BuildingFormDialog({
             void onSubmit(values);
           }}
         >
-          {formError && (
-            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
-              {formError}
-            </div>
-          )}
+          <FormErrorBanner message={formError} />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Bina Adı" error={fieldError(errors, "name")}>
@@ -269,8 +232,7 @@ function BuildingFormDialog({
           </div>
 
           <Field label="Adres" error={fieldError(errors, "address")}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            <Textarea
               value={values.address}
               onChange={(event) => setValue("address", event.target.value)}
               required
@@ -358,8 +320,7 @@ function BuildingFormDialog({
           </div>
 
           <Field label="Notlar" error={fieldError(errors, "notes")}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            <Textarea
               value={values.notes}
               onChange={(event) => setValue("notes", event.target.value)}
             />
@@ -389,24 +350,13 @@ export function BuildingsPage() {
   const [query, setQuery] = React.useState("");
   const [district, setDistrict] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editingBuilding, setEditingBuilding] = React.useState<Building | null>(null);
-  const [deletingBuilding, setDeletingBuilding] = React.useState<Building | null>(null);
-  const [formErrors, setFormErrors] = React.useState<Record<string, string[]>>({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = React.useState(false);
-  const [isDeleting, setDeleting] = React.useState(false);
+  const form = useFormDialog<Building>();
+  const del = useConfirmDelete<Building>();
   const debouncedQuery = useDebounced(query);
 
   React.useEffect(() => {
     setPage(1);
   }, [debouncedQuery, district]);
-
-  const listFilter = React.useMemo<Record<string, string>>(() => {
-    const filter: Record<string, string> = {};
-    if (district !== ALL_VALUE) filter.district = district;
-    return filter;
-  }, [district]);
 
   const listParams = React.useMemo(
     () => ({
@@ -414,9 +364,9 @@ export function BuildingsPage() {
       perPage: 25,
       search: debouncedQuery,
       sort: "name",
-      filter: listFilter,
+      filter: { ...(district === ALL_VALUE ? {} : { district }) },
     }),
-    [page, debouncedQuery, listFilter]
+    [page, debouncedQuery, district]
   );
   const optionParams = React.useMemo(() => ({ perPage: 100, sort: "name" }), []);
   const { items: buildings, pagination, isLoading, error, reload } = useList(
@@ -435,61 +385,17 @@ export function BuildingsPage() {
     [optionBuildings]
   );
 
-  const openCreate = () => {
-    setEditingBuilding(null);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const openEdit = (building: Building) => {
-    setEditingBuilding(building);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (values: BuildingFormValues) => {
-    setSubmitting(true);
-    setFormErrors({});
-    setFormError(null);
-
-    try {
+  const handleSubmit = (values: BuildingFormValues) =>
+    form.submit(async () => {
       const input = formToInput(values);
-      if (editingBuilding) {
-        await updateBuilding(editingBuilding.id, input);
+      if (form.editing) {
+        await updateBuilding(form.editing.id, input);
       } else {
         await createBuilding(input);
       }
-      setFormOpen(false);
-      setEditingBuilding(null);
       reload();
       reloadDistrictOptions();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFormErrors(err.details);
-        setFormError(err.message);
-      } else {
-        setFormError("Beklenmeyen bir hata oluştu.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deletingBuilding) return;
-    setDeleting(true);
-
-    try {
-      await deleteBuilding(deletingBuilding.id);
-      setDeletingBuilding(null);
-      reload();
-      reloadDistrictOptions();
-    } finally {
-      setDeleting(false);
-    }
-  };
+    });
 
   return (
     <div className="space-y-5">
@@ -498,7 +404,7 @@ export function BuildingsPage() {
         description="Hizmet verilen binalar ve sorumluları"
         count={pagination?.total ?? buildings.length}
         actions={
-          <Button onClick={openCreate}>
+          <Button onClick={form.openCreate}>
             <Plus />
             Yeni Bina
           </Button>
@@ -523,26 +429,11 @@ export function BuildingsPage() {
         getRowId={(b) => b.id}
         isLoading={isLoading}
         rowActions={(building) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Bina işlemleri">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openEdit(building)}>
-                <Pencil className="size-4" />
-                Düzenle
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-danger focus:text-danger"
-                onSelect={() => setDeletingBuilding(building)}
-              >
-                <Trash2 className="size-4" />
-                Sil
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            ariaLabel="Bina işlemleri"
+            onEdit={() => form.openEdit(building)}
+            onDelete={() => del.request(building)}
+          />
         )}
         empty={
           <EmptyState
@@ -556,37 +447,31 @@ export function BuildingsPage() {
       <Pagination pagination={pagination} onPageChange={setPage} />
 
       <BuildingFormDialog
-        open={formOpen}
-        building={editingBuilding}
-        errors={formErrors}
-        formError={formError}
-        isSubmitting={isSubmitting}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditingBuilding(null);
-        }}
+        open={form.open}
+        building={form.editing}
+        errors={form.errors}
+        formError={form.formError}
+        isSubmitting={form.isSubmitting}
+        onOpenChange={form.onOpenChange}
         onSubmit={handleSubmit}
       />
 
-      <Dialog open={!!deletingBuilding} onOpenChange={(open) => !open && setDeletingBuilding(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Binayı Sil</DialogTitle>
-            <DialogDescription>
-              {deletingBuilding?.name} kaydı silinecek. Bu işlem liste görünümünden kaldırır.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" disabled={isDeleting} onClick={() => setDeletingBuilding(null)}>
-              Vazgeç
-            </Button>
-            <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
-              {isDeleting && <Loader2 className="animate-spin" />}
-              Sil
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        open={!!del.target}
+        title="Binayı Sil"
+        description={`${del.target?.name ?? ""} kaydı silinecek. Bu işlem kaydı liste görünümünden kaldırır.`}
+        error={del.error}
+        isDeleting={del.isDeleting}
+        onClose={del.close}
+        onConfirm={() =>
+          void del.confirm(async () => {
+            if (!del.target) return;
+            await deleteBuilding(del.target.id);
+            reload();
+            reloadDistrictOptions();
+          })
+        }
+      />
     </div>
   );
 }

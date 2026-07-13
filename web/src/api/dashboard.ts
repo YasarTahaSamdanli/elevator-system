@@ -5,10 +5,10 @@
  * narrow (perPage=1) requests instead of fetching everything and counting
  * client-side; charts fetch the underlying rows and group them in-browser.
  */
-import { fetchContracts, fetchElevators, fetchMaterials, fetchStockMovements, fetchWorkOrders } from "@/api/resources";
+import { fetchContracts, fetchElevators, fetchInspectionImports, fetchMaterials, fetchStockMovements, fetchWorkOrders } from "@/api/resources";
 import { workOrderTypeOrder } from "@/lib/chartColors";
 import { formatDate } from "@/lib/format";
-import { workOrderTypeMeta } from "@/lib/status";
+import { inspectionImportReviewReasonLabel, workOrderTypeMeta } from "@/lib/status";
 import type { AppNotification, Material, StockMovement, WorkOrder, WorkOrderPriority } from "@/types";
 
 const OPEN_STATUSES = ["draft", "planned", "assigned", "in_progress"];
@@ -276,7 +276,7 @@ export async function fetchRecentActivity(limit = 5): Promise<ActivityItem[]> {
  * state only lives in the browser tab for the session.
  */
 export async function fetchOperationalNotifications(limit = 8): Promise<AppNotification[]> {
-  const [urgent, expiring, down, materials] = await Promise.all([
+  const [urgent, expiring, down, materials, followUpDue, inspectionDue, importsToReview] = await Promise.all([
     fetchWorkOrders({
       perPage: 5,
       sort: "scheduled_at",
@@ -293,9 +293,24 @@ export async function fetchOperationalNotifications(limit = 8): Promise<AppNotif
       filter: { status: ["maintenance", "out_of_service"] },
     }),
     fetchMaterials({ perPage: 100, sort: "code", filter: { is_active: "true" } }),
+    // Red/yellow label follow-up deadlines within 15 days (or already overdue).
+    fetchElevators({
+      perPage: 5,
+      sort: "follow_up_due",
+      filter: { follow_up_due_to: daysFromToday(15) },
+    }),
+    // Periodic inspections due within 30 days.
+    fetchElevators({
+      perPage: 5,
+      sort: "next_inspection_due",
+      filter: { next_inspection_due_from: daysFromToday(0), next_inspection_due_to: daysFromToday(30) },
+    }),
+    // RoyalCert report imports parked in the manual review queue.
+    fetchInspectionImports({ perPage: 5, sort: "-created_at", filter: { status: "needs_review" } }),
   ]);
 
   const now = new Date().toISOString();
+  const today = now.slice(0, 10);
 
   const combined: AppNotification[] = [
     ...urgent.items.map((wo) => ({
@@ -320,6 +335,39 @@ export async function fetchOperationalNotifications(limit = 8): Promise<AppNotif
       body: `${e.building_name} · ${e.name ?? e.serial_number}`,
       type: "elevator" as const,
       created_at: now,
+      read: false,
+    })),
+    ...followUpDue.items.map((e) => ({
+      id: `insp-follow-${e.id}`,
+      title:
+        e.follow_up_due && e.follow_up_due < today
+          ? "Etiket takip süresi doldu!"
+          : "Etiket takip süresi doluyor",
+      body: `${e.building_name} · ${e.name ?? e.serial_number} — ${
+        e.current_label ? `${e.current_label === "red" ? "kırmızı" : "sarı"} etiket, ` : ""
+      }takip kontrolü: ${e.follow_up_due ? formatDate(e.follow_up_due) : "—"}`,
+      type: "elevator" as const,
+      created_at: e.follow_up_due ?? now,
+      read: false,
+    })),
+    ...inspectionDue.items.map((e) => ({
+      id: `insp-next-${e.id}`,
+      title: "Periyodik kontrol yaklaşıyor",
+      body: `${e.building_name} · ${e.name ?? e.serial_number} — sonraki kontrol: ${
+        e.next_inspection_due ? formatDate(e.next_inspection_due) : "—"
+      }`,
+      type: "elevator" as const,
+      created_at: e.next_inspection_due ?? now,
+      read: false,
+    })),
+    ...importsToReview.items.map((imp) => ({
+      id: `imp-${imp.id}`,
+      title: "İncelenmesi gereken muayene raporu",
+      body: `${imp.mail_subject ?? imp.original_filename ?? "Rapor"}${
+        imp.review_reason ? ` — ${inspectionImportReviewReasonLabel[imp.review_reason]}` : ""
+      }`,
+      type: "system" as const,
+      created_at: imp.mail_received_at ?? imp.created_at,
       read: false,
     })),
     ...materials.items

@@ -3,12 +3,18 @@
  * nested relation objects) are mapped onto the UI domain types in
  * `@/types`, so pages and components stay unchanged.
  */
-import { api, listQueryString, type ListParams, type PaginationMeta } from "@/lib/api";
+import { api, apiBlob, listQueryString, type ListParams, type PaginationMeta } from "@/lib/api";
 import type {
+  AccountSummary,
+  AccountTransaction,
   Building,
   Elevator,
+  ElevatorInspection,
+  InspectionFinding,
+  InspectionImport,
   Material,
   MaterialUnit,
+  PaymentMethod,
   ServiceContract,
   StockMovement,
   User,
@@ -75,6 +81,31 @@ interface ElevatorPayload {
   stop_count: number | null;
   registration_number: string | null;
   status: Elevator["status"];
+  current_label: Elevator["current_label"];
+  last_inspection_at: string | null;
+  next_inspection_due: string | null;
+  follow_up_due: string | null;
+  notes: string | null;
+}
+
+interface InspectionFindingPayload {
+  uuid: string;
+  description: string;
+  is_resolved: boolean;
+}
+
+interface ElevatorInspectionPayload {
+  uuid: string;
+  elevator: Ref & { serial_number: string | null; building: Ref };
+  type: ElevatorInspection["type"];
+  inspection_body: string | null;
+  inspected_at: string;
+  label: ElevatorInspection["label"];
+  report_number: string | null;
+  follow_up_due_date: string | null;
+  next_inspection_date: string | null;
+  work_order: { uuid: string; work_order_number: string; status: WorkOrder["status"] } | null;
+  findings?: InspectionFindingPayload[];
   notes: string | null;
 }
 
@@ -137,6 +168,7 @@ interface MaterialPayload {
   category: string | null;
   min_stock_level: string | number;
   default_unit_price: string | number | null;
+  default_sale_price: string | number | null;
   stock_on_hand?: string | number;
   is_active: boolean;
   notes: string | null;
@@ -171,6 +203,28 @@ interface WorkOrderItemPayload {
   unit_price: string | number | null;
   total_price: string | number | null;
   note: string | null;
+}
+
+interface PaymentMethodPayload {
+  uuid: string;
+  name: string;
+  is_active: boolean;
+}
+
+interface AccountTransactionPayload {
+  uuid: string;
+  building: Ref;
+  elevator: { uuid: string; name: string | null; serial_number: string | null } | null;
+  type: AccountTransaction["type"];
+  amount: string | number;
+  signed_amount: string | number;
+  occurred_at: string;
+  work_order: { uuid: string; work_order_number: string } | null;
+  payment_method: { uuid: string; name: string } | null;
+  collected_by: { uuid: string; name: string } | null;
+  payer_name: string | null;
+  description: string | null;
+  created_at: string;
 }
 
 /* ---------- mappers ---------- */
@@ -212,6 +266,35 @@ function mapElevator(p: ElevatorPayload): Elevator {
     stop_count: p.stop_count,
     registration_number: p.registration_number,
     status: p.status,
+    current_label: p.current_label,
+    last_inspection_at: p.last_inspection_at,
+    next_inspection_due: p.next_inspection_due,
+    follow_up_due: p.follow_up_due,
+    notes: p.notes,
+  };
+}
+
+function mapInspectionFinding(p: InspectionFindingPayload): InspectionFinding {
+  return { id: p.uuid, description: p.description, is_resolved: p.is_resolved };
+}
+
+function mapInspection(p: ElevatorInspectionPayload): ElevatorInspection {
+  return {
+    id: p.uuid,
+    elevator_id: p.elevator.uuid ?? "",
+    elevator_name: p.elevator.name ?? p.elevator.serial_number ?? "—",
+    building_name: p.elevator.building.name ?? "—",
+    type: p.type,
+    inspection_body: p.inspection_body,
+    inspected_at: p.inspected_at,
+    label: p.label,
+    report_number: p.report_number,
+    follow_up_due_date: p.follow_up_due_date,
+    next_inspection_date: p.next_inspection_date,
+    work_order: p.work_order
+      ? { id: p.work_order.uuid, work_order_number: p.work_order.work_order_number, status: p.work_order.status }
+      : null,
+    findings: (p.findings ?? []).map(mapInspectionFinding),
     notes: p.notes,
   };
 }
@@ -271,6 +354,7 @@ function mapMaterial(p: MaterialPayload): Material {
     category: p.category,
     min_stock_level: Number(p.min_stock_level),
     default_unit_price: num(p.default_unit_price),
+    default_sale_price: num(p.default_sale_price),
     stock_on_hand: Number(p.stock_on_hand ?? 0),
     is_active: p.is_active,
     notes: p.notes,
@@ -327,6 +411,34 @@ function mapWorkOrderItem(p: WorkOrderItemPayload): NonNullable<WorkOrder["items
     unit_price: num(p.unit_price),
     total_price: num(p.total_price),
     note: p.note,
+  };
+}
+
+function mapPaymentMethod(p: PaymentMethodPayload): PaymentMethod {
+  return { id: p.uuid, name: p.name, is_active: p.is_active };
+}
+
+function mapAccountTransaction(p: AccountTransactionPayload): AccountTransaction {
+  return {
+    id: p.uuid,
+    building: { id: p.building.uuid ?? "", name: p.building.name ?? "—" },
+    elevator: p.elevator
+      ? { id: p.elevator.uuid, name: p.elevator.name, serial_number: p.elevator.serial_number }
+      : null,
+    type: p.type,
+    amount: Number(p.amount),
+    signed_amount: Number(p.signed_amount),
+    occurred_at: p.occurred_at,
+    work_order: p.work_order
+      ? { id: p.work_order.uuid, work_order_number: p.work_order.work_order_number }
+      : null,
+    payment_method: p.payment_method
+      ? { id: p.payment_method.uuid, name: p.payment_method.name }
+      : null,
+    collected_by: p.collected_by ? { id: p.collected_by.uuid, name: p.collected_by.name } : null,
+    payer_name: p.payer_name,
+    description: p.description,
+    created_at: p.created_at,
   };
 }
 
@@ -416,6 +528,69 @@ export async function updateElevator(uuid: string, input: ElevatorInput): Promis
 
 export async function deleteElevator(uuid: string): Promise<void> {
   await api(`/elevators/${uuid}`, { method: "DELETE" });
+}
+
+export const fetchInspections = (params: ListParams = {}) =>
+  fetchList<ElevatorInspectionPayload, ElevatorInspection>("/elevator-inspections", params, mapInspection);
+
+export interface InspectionFindingInput {
+  description: string;
+  is_resolved?: boolean;
+}
+
+export interface InspectionInput {
+  elevator_uuid?: string;
+  type: ElevatorInspection["type"];
+  inspection_body: string | null;
+  inspected_at: string;
+  label: ElevatorInspection["label"];
+  report_number: string | null;
+  follow_up_due_date: string | null;
+  next_inspection_date: string | null;
+  notes: string | null;
+  findings: InspectionFindingInput[];
+}
+
+export async function createInspection(input: InspectionInput): Promise<ElevatorInspection> {
+  const { data } = await api<ElevatorInspectionPayload>("/elevator-inspections", {
+    method: "POST",
+    body: input,
+  });
+  return mapInspection(data);
+}
+
+export async function updateInspection(uuid: string, input: InspectionInput): Promise<ElevatorInspection> {
+  // elevator_uuid is not updatable — an inspection stays on its elevator.
+  const { elevator_uuid: _elevator, ...body } = input;
+  const { data } = await api<ElevatorInspectionPayload>(`/elevator-inspections/${uuid}`, {
+    method: "PUT",
+    body,
+  });
+  return mapInspection(data);
+}
+
+export async function deleteInspection(uuid: string): Promise<void> {
+  await api(`/elevator-inspections/${uuid}`, { method: "DELETE" });
+}
+
+export async function updateInspectionFinding(
+  inspectionUuid: string,
+  findingUuid: string,
+  body: { description?: string; is_resolved?: boolean }
+): Promise<void> {
+  await api(`/elevator-inspections/${inspectionUuid}/findings/${findingUuid}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+/** Opens a repair work order for the inspection's unresolved findings. */
+export async function createInspectionWorkOrder(inspectionUuid: string): Promise<ElevatorInspection> {
+  const { data } = await api<ElevatorInspectionPayload>(
+    `/elevator-inspections/${inspectionUuid}/work-order`,
+    { method: "POST" }
+  );
+  return mapInspection(data);
 }
 
 export const fetchContracts = (params: ListParams = {}) =>
@@ -515,6 +690,7 @@ export interface WorkOrderInput {
   assigned_user_uuid: string | null;
   description: string | null;
   notes: string | null;
+  items?: WorkOrderItemInput[];
 }
 
 export async function createWorkOrder(input: WorkOrderInput): Promise<WorkOrder> {
@@ -547,6 +723,7 @@ export interface MaterialInput {
   category: string | null;
   min_stock_level: number;
   default_unit_price: number | null;
+  default_sale_price: number | null;
   is_active: boolean;
   notes: string | null;
 }
@@ -636,6 +813,71 @@ export async function createStockTransfer(input: StockTransferInput): Promise<St
   return data.map(mapStockMovement);
 }
 
+export const fetchPaymentMethods = (params: ListParams = {}) =>
+  fetchList<PaymentMethodPayload, PaymentMethod>("/payment-methods", params, mapPaymentMethod);
+
+export async function createPaymentMethod(name: string): Promise<PaymentMethod> {
+  const { data } = await api<PaymentMethodPayload>("/payment-methods", {
+    method: "POST",
+    body: { name },
+  });
+  return mapPaymentMethod(data);
+}
+
+export async function updatePaymentMethod(
+  uuid: string,
+  input: { name?: string; is_active?: boolean }
+): Promise<PaymentMethod> {
+  const { data } = await api<PaymentMethodPayload>(`/payment-methods/${uuid}`, {
+    method: "PATCH",
+    body: input,
+  });
+  return mapPaymentMethod(data);
+}
+
+export const fetchAccountTransactions = (params: ListParams = {}) =>
+  fetchList<AccountTransactionPayload, AccountTransaction>(
+    "/account-transactions",
+    params,
+    mapAccountTransaction
+  );
+
+export interface AccountTransactionInput {
+  building_uuid: string;
+  elevator_uuid?: string | null;
+  type: AccountTransaction["type"];
+  amount: number;
+  occurred_at: string;
+  payment_method_uuid?: string | null;
+  payer_name?: string | null;
+  description?: string | null;
+}
+
+export async function createAccountTransaction(
+  input: AccountTransactionInput
+): Promise<AccountTransaction> {
+  const { data } = await api<AccountTransactionPayload>("/account-transactions", {
+    method: "POST",
+    body: input,
+  });
+  return mapAccountTransaction(data);
+}
+
+export async function fetchAccountSummary(params: {
+  building_uuid?: string;
+  elevator_uuid?: string;
+  occurred_at_from?: string;
+  occurred_at_to?: string;
+}): Promise<AccountSummary> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value);
+  }
+  const qs = query.toString();
+  const { data } = await api<AccountSummary>(`/account-transactions/summary${qs ? `?${qs}` : ""}`);
+  return data;
+}
+
 export const fetchUsers = (params: ListParams = {}) =>
   fetchList<UserPayload, User>("/users", params, mapUser);
 
@@ -669,6 +911,130 @@ export async function updateUser(uuid: string, input: UserInput): Promise<User> 
 
 export async function deleteUser(uuid: string): Promise<void> {
   await api(`/users/${uuid}`, { method: "DELETE" });
+}
+
+/* ---------- inspection imports (RoyalCert report pipeline) ---------- */
+
+interface InspectionImportPayload {
+  uuid: string;
+  source: InspectionImport["source"];
+  status: InspectionImport["status"];
+  review_reason: InspectionImport["review_reason"];
+  error_message: string | null;
+  work_order_error: string | null;
+  mail_from: string | null;
+  mail_subject: string | null;
+  mail_received_at: string | null;
+  original_filename: string | null;
+  report_number: string | null;
+  parsed_payload: {
+    label?: InspectionImport["parsed_label"];
+    type?: InspectionImport["parsed_type"];
+    identity?: string | null;
+    findings?: string[];
+    warnings?: string[];
+  } | null;
+  matched_via: string | null;
+  elevator: (Ref & { serial_number: string | null; building: Ref }) | null;
+  inspection: {
+    uuid: string;
+    label: ElevatorInspection["label"];
+    inspected_at: string | null;
+    work_order: { uuid: string; work_order_number: string; status: WorkOrder["status"] } | null;
+  } | null;
+  created_at: string;
+}
+
+function mapInspectionImport(p: InspectionImportPayload): InspectionImport {
+  return {
+    id: p.uuid,
+    source: p.source,
+    status: p.status,
+    review_reason: p.review_reason,
+    error_message: p.error_message,
+    work_order_error: p.work_order_error,
+    mail_from: p.mail_from,
+    mail_subject: p.mail_subject,
+    mail_received_at: p.mail_received_at,
+    original_filename: p.original_filename,
+    report_number: p.report_number,
+    parsed_label: p.parsed_payload?.label ?? null,
+    parsed_type: p.parsed_payload?.type ?? null,
+    parsed_identity: p.parsed_payload?.identity ?? null,
+    parsed_findings: p.parsed_payload?.findings ?? [],
+    parsed_warnings: p.parsed_payload?.warnings ?? [],
+    matched_via: p.matched_via,
+    elevator_id: p.elevator?.uuid ?? null,
+    elevator_name: p.elevator ? (p.elevator.name ?? p.elevator.serial_number ?? "—") : null,
+    building_name: p.elevator?.building.name ?? null,
+    inspection: p.inspection
+      ? {
+          id: p.inspection.uuid,
+          label: p.inspection.label,
+          inspected_at: p.inspection.inspected_at,
+          work_order: p.inspection.work_order
+            ? {
+                id: p.inspection.work_order.uuid,
+                work_order_number: p.inspection.work_order.work_order_number,
+                status: p.inspection.work_order.status,
+              }
+            : null,
+        }
+      : null,
+    created_at: p.created_at,
+  };
+}
+
+export const fetchInspectionImports = (params: ListParams = {}) =>
+  fetchList<InspectionImportPayload, InspectionImport>(
+    "/inspection-imports",
+    params,
+    mapInspectionImport
+  );
+
+export async function uploadInspectionImport(file: File): Promise<InspectionImport> {
+  const body = new FormData();
+  body.append("file", file);
+
+  const { data } = await api<InspectionImportPayload>("/inspection-imports", {
+    method: "POST",
+    body,
+  });
+  return mapInspectionImport(data);
+}
+
+export async function matchInspectionImport(
+  uuid: string,
+  elevatorUuid: string
+): Promise<InspectionImport> {
+  const { data } = await api<InspectionImportPayload>(`/inspection-imports/${uuid}/match`, {
+    method: "POST",
+    body: { elevator_uuid: elevatorUuid },
+  });
+  return mapInspectionImport(data);
+}
+
+export async function retryInspectionImport(uuid: string): Promise<InspectionImport> {
+  const { data } = await api<InspectionImportPayload>(`/inspection-imports/${uuid}/retry`, {
+    method: "POST",
+  });
+  return mapInspectionImport(data);
+}
+
+export async function ignoreInspectionImport(uuid: string): Promise<InspectionImport> {
+  const { data } = await api<InspectionImportPayload>(`/inspection-imports/${uuid}/ignore`, {
+    method: "POST",
+  });
+  return mapInspectionImport(data);
+}
+
+export async function deleteInspectionImport(uuid: string): Promise<void> {
+  await api(`/inspection-imports/${uuid}`, { method: "DELETE" });
+}
+
+/** Open the stored report PDF in a new tab (auth-protected blob). */
+export async function fetchInspectionImportPdf(uuid: string): Promise<Blob> {
+  return apiBlob(`/inspection-imports/${uuid}/pdf`);
 }
 
 /* ---------- auth ---------- */

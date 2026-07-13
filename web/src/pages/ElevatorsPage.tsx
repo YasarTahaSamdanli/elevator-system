@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowUpDown, Loader2, MoreHorizontal, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
+import { ArrowUpDown, Loader2, Plus, QrCode } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Toolbar } from "@/components/common/Toolbar";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -9,6 +9,9 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListError } from "@/components/common/ListError";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Field, FormErrorBanner } from "@/components/common/Field";
+import { ConfirmDeleteDialog, useConfirmDelete } from "@/components/common/ConfirmDeleteDialog";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,13 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -33,8 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { elevatorStatusMeta } from "@/lib/status";
-import { formatNumber } from "@/lib/format";
+import { elevatorStatusMeta, inspectionLabelMeta } from "@/lib/status";
+import { formatDate, formatNumber } from "@/lib/format";
+import { blankToNull, fieldError, metaOptions, numericOrNull } from "@/lib/forms";
 import {
   createElevator,
   deleteElevator,
@@ -44,7 +43,7 @@ import {
   type ElevatorInput,
 } from "@/api/resources";
 import { useDebounced, useList } from "@/hooks/useList";
-import { ApiError } from "@/lib/api";
+import { useFormDialog } from "@/hooks/useFormDialog";
 import type { Building, Elevator, ElevatorStatus } from "@/types";
 
 const columns: Column<Elevator>[] = [
@@ -112,12 +111,31 @@ const columns: Column<Elevator>[] = [
     sortAccessor: (e) => e.status,
     cell: (e) => <StatusBadge meta={elevatorStatusMeta[e.status]} />,
   },
+  {
+    key: "label",
+    header: "Etiket",
+    sortAccessor: (e) => e.current_label,
+    cell: (e) =>
+      e.current_label ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <StatusBadge meta={inspectionLabelMeta[e.current_label]} />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="text-xs">
+            {e.last_inspection_at ? `Son kontrol: ${formatDate(e.last_inspection_at)}` : ""}
+            {e.follow_up_due ? ` · Takip: ${formatDate(e.follow_up_due)}` : ""}
+            {e.next_inspection_due ? ` · Sonraki: ${formatDate(e.next_inspection_due)}` : ""}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
 ];
 
-const statusOptions = (Object.keys(elevatorStatusMeta) as ElevatorStatus[]).map((s) => ({
-  value: s,
-  label: elevatorStatusMeta[s].label,
-}));
+const statusOptions = metaOptions<ElevatorStatus>(elevatorStatusMeta);
 
 interface ElevatorFormValues {
   building_uuid: string;
@@ -147,16 +165,6 @@ const emptyForm: ElevatorFormValues = {
   registration_number: "",
   status: "active",
   notes: "",
-};
-
-const blankToNull = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-};
-
-const numericOrNull = (value: string): number | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : Number(trimmed);
 };
 
 function formFromElevator(elevator: Elevator | null): ElevatorFormValues {
@@ -193,28 +201,6 @@ function formToInput(values: ElevatorFormValues): ElevatorInput {
     status: values.status,
     notes: blankToNull(values.notes),
   };
-}
-
-function fieldError(errors: Record<string, string[]>, field: keyof ElevatorFormValues) {
-  return errors[field]?.[0] ?? null;
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
-    </label>
-  );
 }
 
 function ElevatorFormDialog({
@@ -274,11 +260,7 @@ function ElevatorFormDialog({
             void onSubmit(values);
           }}
         >
-          {formError && (
-            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
-              {formError}
-            </div>
-          )}
+          <FormErrorBanner message={formError} />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Bina" error={fieldError(errors, "building_uuid")}>
@@ -390,8 +372,7 @@ function ElevatorFormDialog({
           </div>
 
           <Field label="Notlar" error={fieldError(errors, "notes")}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            <Textarea
               value={values.notes}
               onChange={(event) => setValue("notes", event.target.value)}
             />
@@ -422,13 +403,8 @@ export function ElevatorsPage() {
   const [status, setStatus] = React.useState(ALL_VALUE);
   const [building, setBuilding] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editingElevator, setEditingElevator] = React.useState<Elevator | null>(null);
-  const [deletingElevator, setDeletingElevator] = React.useState<Elevator | null>(null);
-  const [formErrors, setFormErrors] = React.useState<Record<string, string[]>>({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = React.useState(false);
-  const [isDeleting, setDeleting] = React.useState(false);
+  const form = useFormDialog<Elevator>();
+  const del = useConfirmDelete<Elevator>();
   const debouncedQuery = useDebounced(query);
 
   React.useEffect(() => {
@@ -455,59 +431,16 @@ export function ElevatorsPage() {
   );
   const { items: buildingOptions } = useList(fetchBuildings, buildingParams);
 
-  const openCreate = () => {
-    setEditingElevator(null);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const openEdit = (elevator: Elevator) => {
-    setEditingElevator(elevator);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (values: ElevatorFormValues) => {
-    setSubmitting(true);
-    setFormErrors({});
-    setFormError(null);
-
-    try {
+  const handleSubmit = (values: ElevatorFormValues) =>
+    form.submit(async () => {
       const input = formToInput(values);
-      if (editingElevator) {
-        await updateElevator(editingElevator.id, input);
+      if (form.editing) {
+        await updateElevator(form.editing.id, input);
       } else {
         await createElevator(input);
       }
-      setFormOpen(false);
-      setEditingElevator(null);
       reload();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFormErrors(err.details);
-        setFormError(err.message);
-      } else {
-        setFormError("Beklenmeyen bir hata oluştu.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deletingElevator) return;
-    setDeleting(true);
-
-    try {
-      await deleteElevator(deletingElevator.id);
-      setDeletingElevator(null);
-      reload();
-    } finally {
-      setDeleting(false);
-    }
-  };
+    });
 
   return (
     <div className="space-y-5">
@@ -516,7 +449,7 @@ export function ElevatorsPage() {
         description="Bakım sözleşmeli asansör envanteri"
         count={pagination?.total ?? elevators.length}
         actions={
-          <Button onClick={openCreate}>
+          <Button onClick={form.openCreate}>
             <Plus />
             Yeni Asansör
           </Button>
@@ -551,26 +484,11 @@ export function ElevatorsPage() {
         getRowId={(e) => e.id}
         isLoading={isLoading}
         rowActions={(elevator) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Asansör işlemleri">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openEdit(elevator)}>
-                <Pencil className="size-4" />
-                Düzenle
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-danger focus:text-danger"
-                onSelect={() => setDeletingElevator(elevator)}
-              >
-                <Trash2 className="size-4" />
-                Sil
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            ariaLabel="Asansör işlemleri"
+            onEdit={() => form.openEdit(elevator)}
+            onDelete={() => del.request(elevator)}
+          />
         )}
         empty={
           <EmptyState
@@ -584,45 +502,33 @@ export function ElevatorsPage() {
       <Pagination pagination={pagination} onPageChange={setPage} />
 
       <ElevatorFormDialog
-        open={formOpen}
-        elevator={editingElevator}
+        open={form.open}
+        elevator={form.editing}
         buildings={buildingOptions}
-        errors={formErrors}
-        formError={formError}
-        isSubmitting={isSubmitting}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditingElevator(null);
-        }}
+        errors={form.errors}
+        formError={form.formError}
+        isSubmitting={form.isSubmitting}
+        onOpenChange={form.onOpenChange}
         onSubmit={handleSubmit}
       />
 
-      <Dialog open={!!deletingElevator} onOpenChange={(open) => !open && setDeletingElevator(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Asansörü Sil</DialogTitle>
-            <DialogDescription>
-              {deletingElevator
-                ? `${deletingElevator.name ?? deletingElevator.serial_number} kaydı silinecek.`
-                : ""}{" "}
-              Bu işlem kaydı liste görünümünden kaldırır.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={isDeleting}
-              onClick={() => setDeletingElevator(null)}
-            >
-              Vazgeç
-            </Button>
-            <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
-              {isDeleting && <Loader2 className="animate-spin" />}
-              Sil
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        open={!!del.target}
+        title="Asansörü Sil"
+        description={`${
+          del.target ? del.target.name ?? del.target.serial_number : ""
+        } kaydı silinecek. Bu işlem kaydı liste görünümünden kaldırır.`}
+        error={del.error}
+        isDeleting={del.isDeleting}
+        onClose={del.close}
+        onConfirm={() =>
+          void del.confirm(async () => {
+            if (!del.target) return;
+            await deleteElevator(del.target.id);
+            reload();
+          })
+        }
+      />
     </div>
   );
 }

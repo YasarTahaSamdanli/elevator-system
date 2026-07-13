@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FileText, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileText, Loader2, Plus } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Toolbar } from "@/components/common/Toolbar";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -9,6 +9,9 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListError } from "@/components/common/ListError";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Field, FormErrorBanner } from "@/components/common/Field";
+import { ConfirmDeleteDialog, useConfirmDelete } from "@/components/common/ConfirmDeleteDialog";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,13 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -35,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { contractStatusMeta } from "@/lib/status";
 import { daysUntil, formatCurrency, formatDate } from "@/lib/format";
+import { blankToNull, fieldError, metaOptions, numericOrNull, toDateInput } from "@/lib/forms";
 import {
   createContract,
   deleteContract,
@@ -44,7 +43,7 @@ import {
   type ContractInput,
 } from "@/api/resources";
 import { useDebounced, useList } from "@/hooks/useList";
-import { ApiError } from "@/lib/api";
+import { useFormDialog } from "@/hooks/useFormDialog";
 import type { ContractStatus, Elevator, ServiceContract } from "@/types";
 
 const columns: Column<ServiceContract>[] = [
@@ -99,10 +98,7 @@ const columns: Column<ServiceContract>[] = [
   },
 ];
 
-const statusOptions = (Object.keys(contractStatusMeta) as ContractStatus[]).map((s) => ({
-  value: s,
-  label: contractStatusMeta[s].label,
-}));
+const statusOptions = metaOptions<ContractStatus>(contractStatusMeta);
 
 interface ContractFormValues {
   elevator_uuid: string;
@@ -123,19 +119,6 @@ const emptyForm: ContractFormValues = {
   monthly_fee: "",
   notes: "",
 };
-
-const blankToNull = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-};
-
-const numericOrNull = (value: string): number | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : Number(trimmed);
-};
-
-/** Normalize an API date(time) string to the YYYY-MM-DD shape date inputs need. */
-const toDateInput = (value: string): string => value.slice(0, 10);
 
 function formFromContract(contract: ServiceContract | null): ContractFormValues {
   if (!contract) return emptyForm;
@@ -163,31 +146,9 @@ function formToInput(values: ContractFormValues): ContractInput {
   };
 }
 
-function fieldError(errors: Record<string, string[]>, field: keyof ContractFormValues) {
-  return errors[field]?.[0] ?? null;
-}
-
 function elevatorLabel(elevator: Elevator): string {
   const name = elevator.name ?? elevator.serial_number;
   return `${elevator.building_name} · ${name}`;
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
-    </label>
-  );
 }
 
 function ContractFormDialog({
@@ -241,11 +202,7 @@ function ContractFormDialog({
             void onSubmit(values);
           }}
         >
-          {formError && (
-            <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">
-              {formError}
-            </div>
-          )}
+          <FormErrorBanner message={formError} />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Asansör" error={fieldError(errors, "elevator_uuid")}>
@@ -323,8 +280,7 @@ function ContractFormDialog({
           </div>
 
           <Field label="Notlar" error={fieldError(errors, "notes")}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            <Textarea
               value={values.notes}
               onChange={(event) => setValue("notes", event.target.value)}
             />
@@ -354,24 +310,13 @@ export function ContractsPage() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editingContract, setEditingContract] = React.useState<ServiceContract | null>(null);
-  const [deletingContract, setDeletingContract] = React.useState<ServiceContract | null>(null);
-  const [formErrors, setFormErrors] = React.useState<Record<string, string[]>>({});
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = React.useState(false);
-  const [isDeleting, setDeleting] = React.useState(false);
+  const form = useFormDialog<ServiceContract>();
+  const del = useConfirmDelete<ServiceContract>();
   const debouncedQuery = useDebounced(query);
 
   React.useEffect(() => {
     setPage(1);
   }, [debouncedQuery, status]);
-
-  const listFilter = React.useMemo<Record<string, string>>(() => {
-    const filter: Record<string, string> = {};
-    if (status !== ALL_VALUE) filter.status = status;
-    return filter;
-  }, [status]);
 
   const listParams = React.useMemo(
     () => ({
@@ -379,9 +324,9 @@ export function ContractsPage() {
       perPage: 25,
       search: debouncedQuery,
       sort: "end_date",
-      filter: listFilter,
+      filter: { ...(status === ALL_VALUE ? {} : { status }) },
     }),
-    [page, debouncedQuery, listFilter]
+    [page, debouncedQuery, status]
   );
   const elevatorParams = React.useMemo(() => ({ perPage: 100, sort: "name" }), []);
   const { items: contracts, pagination, isLoading, error, reload } = useList(
@@ -390,59 +335,16 @@ export function ContractsPage() {
   );
   const { items: elevatorOptions } = useList(fetchElevators, elevatorParams);
 
-  const openCreate = () => {
-    setEditingContract(null);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const openEdit = (contract: ServiceContract) => {
-    setEditingContract(contract);
-    setFormErrors({});
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (values: ContractFormValues) => {
-    setSubmitting(true);
-    setFormErrors({});
-    setFormError(null);
-
-    try {
+  const handleSubmit = (values: ContractFormValues) =>
+    form.submit(async () => {
       const input = formToInput(values);
-      if (editingContract) {
-        await updateContract(editingContract.id, input);
+      if (form.editing) {
+        await updateContract(form.editing.id, input);
       } else {
         await createContract(input);
       }
-      setFormOpen(false);
-      setEditingContract(null);
       reload();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFormErrors(err.details);
-        setFormError(err.message);
-      } else {
-        setFormError("Beklenmeyen bir hata oluştu.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deletingContract) return;
-    setDeleting(true);
-
-    try {
-      await deleteContract(deletingContract.id);
-      setDeletingContract(null);
-      reload();
-    } finally {
-      setDeleting(false);
-    }
-  };
+    });
 
   return (
     <div className="space-y-5">
@@ -451,7 +353,7 @@ export function ContractsPage() {
         description="Asansör bakım sözleşmeleri ve yenileme takibi"
         count={pagination?.total ?? contracts.length}
         actions={
-          <Button onClick={openCreate}>
+          <Button onClick={form.openCreate}>
             <Plus />
             Yeni Sözleşme
           </Button>
@@ -480,26 +382,11 @@ export function ContractsPage() {
         getRowId={(c) => c.id}
         isLoading={isLoading}
         rowActions={(contract) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Sözleşme işlemleri">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openEdit(contract)}>
-                <Pencil className="size-4" />
-                Düzenle
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-danger focus:text-danger"
-                onSelect={() => setDeletingContract(contract)}
-              >
-                <Trash2 className="size-4" />
-                Sil
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            ariaLabel="Sözleşme işlemleri"
+            onEdit={() => form.openEdit(contract)}
+            onDelete={() => del.request(contract)}
+          />
         )}
         empty={
           <EmptyState
@@ -513,45 +400,33 @@ export function ContractsPage() {
       <Pagination pagination={pagination} onPageChange={setPage} />
 
       <ContractFormDialog
-        open={formOpen}
-        contract={editingContract}
+        open={form.open}
+        contract={form.editing}
         elevators={elevatorOptions}
-        errors={formErrors}
-        formError={formError}
-        isSubmitting={isSubmitting}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditingContract(null);
-        }}
+        errors={form.errors}
+        formError={form.formError}
+        isSubmitting={form.isSubmitting}
+        onOpenChange={form.onOpenChange}
         onSubmit={handleSubmit}
       />
 
-      <Dialog open={!!deletingContract} onOpenChange={(open) => !open && setDeletingContract(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sözleşmeyi Sil</DialogTitle>
-            <DialogDescription>
-              {deletingContract
-                ? `${deletingContract.contract_number ?? "Numarasız"} sözleşme kaydı silinecek.`
-                : ""}{" "}
-              Bu işlem kaydı liste görünümünden kaldırır.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={isDeleting}
-              onClick={() => setDeletingContract(null)}
-            >
-              Vazgeç
-            </Button>
-            <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
-              {isDeleting && <Loader2 className="animate-spin" />}
-              Sil
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        open={!!del.target}
+        title="Sözleşmeyi Sil"
+        description={`${
+          del.target ? del.target.contract_number ?? "Numarasız" : ""
+        } sözleşme kaydı silinecek. Bu işlem kaydı liste görünümünden kaldırır.`}
+        error={del.error}
+        isDeleting={del.isDeleting}
+        onClose={del.close}
+        onConfirm={() =>
+          void del.confirm(async () => {
+            if (!del.target) return;
+            await deleteContract(del.target.id);
+            reload();
+          })
+        }
+      />
     </div>
   );
 }

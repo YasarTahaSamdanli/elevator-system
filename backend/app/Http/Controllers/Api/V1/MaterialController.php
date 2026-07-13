@@ -29,7 +29,7 @@ class MaterialController extends Controller
 
         $materials = ListQuery::for($query, $request)
             ->filterable(['unit', 'category', 'is_active'])
-            ->searchable(['code', 'name', 'category'])
+            ->searchable(['code', 'name', 'category', 'unit'])
             ->sortable(['code', 'name', 'category', 'unit', 'min_stock_level', 'default_unit_price', 'created_at', 'updated_at'])
             ->dateRange('created_at')
             ->paginate();

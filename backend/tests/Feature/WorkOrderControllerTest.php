@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Elevator;
+use App\Models\Material;
 use App\Models\ServiceContract;
 use App\Models\User;
 use App\Models\WorkOrder;
+use Database\Seeders\DefaultRoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +40,25 @@ class WorkOrderControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonCount(2, 'data');
+    }
+
+    public function test_work_orders_can_be_filtered_by_elevator_uuid(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $elevator = Elevator::factory()->create(['company_id' => $company->id]);
+        $serviceContract = ServiceContract::factory()->create(['elevator_id' => $elevator->id]);
+        $otherElevator = Elevator::factory()->create(['company_id' => $company->id]);
+        $otherServiceContract = ServiceContract::factory()->create(['elevator_id' => $otherElevator->id]);
+
+        $workOrder = WorkOrder::factory()->create(['service_contract_id' => $serviceContract->id]);
+        WorkOrder::factory()->create(['service_contract_id' => $otherServiceContract->id]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/work-orders?filter[elevator_uuid]='.$elevator->uuid)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.uuid', $workOrder->uuid);
     }
 
     public function test_authenticated_user_can_view_a_single_work_order(): void
@@ -122,6 +143,41 @@ class WorkOrderControllerTest extends TestCase
         $this->assertDatabaseHas('work_orders', [
             'service_contract_id' => $serviceContract->id,
             'assigned_user_id' => $technician->id,
+        ]);
+    }
+
+    public function test_authenticated_user_can_create_a_work_order_with_material_items(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $elevator = Elevator::factory()->create(['company_id' => $company->id]);
+        $serviceContract = ServiceContract::factory()->create(['elevator_id' => $elevator->id]);
+        $material = Material::factory()->create([
+            'company_id' => $company->id,
+            'default_unit_price' => 125,
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/v1/work-orders', [
+            'service_contract_uuid' => $serviceContract->uuid,
+            'type' => 'maintenance',
+            'items' => [
+                [
+                    'material_uuid' => $material->uuid,
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.items.0.material.uuid', $material->uuid)
+            ->assertJsonPath('data.items.0.quantity', '2.000');
+
+        $this->assertDatabaseHas('work_order_items', [
+            'company_id' => $company->id,
+            'material_id' => $material->id,
+            'quantity' => '2.000',
+            'unit_price' => '125.00',
         ]);
     }
 
@@ -290,6 +346,133 @@ class WorkOrderControllerTest extends TestCase
         $this->assertSoftDeleted('work_orders', [
             'id' => $workOrder->id,
         ]);
+    }
+
+    public function test_technician_cannot_start_a_work_order_without_scanning_the_elevator_qr(): void
+    {
+        [$technician, $workOrder] = $this->createAssignedWorkOrderWithTechnician();
+
+        $this->actingAs($technician)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", ['status' => 'in_progress'])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR')
+            ->assertJsonStructure(['error' => ['details' => ['qr_identifier']]]);
+
+        $this->assertDatabaseHas('work_orders', [
+            'id' => $workOrder->id,
+            'status' => 'assigned',
+        ]);
+    }
+
+    public function test_technician_cannot_start_a_work_order_with_another_elevators_qr(): void
+    {
+        [$technician, $workOrder, $company] = $this->createAssignedWorkOrderWithTechnician();
+        $otherElevator = Elevator::factory()->create(['company_id' => $company->id]);
+
+        $this->actingAs($technician)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", [
+                'status' => 'in_progress',
+                'qr_identifier' => $otherElevator->qr_identifier,
+            ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['error' => ['details' => ['qr_identifier']]]);
+
+        $this->assertDatabaseHas('work_orders', [
+            'id' => $workOrder->id,
+            'status' => 'assigned',
+        ]);
+    }
+
+    public function test_technician_can_start_a_work_order_by_scanning_the_matching_elevator_qr(): void
+    {
+        [$technician, $workOrder] = $this->createAssignedWorkOrderWithTechnician();
+
+        $this->actingAs($technician)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", [
+                'status' => 'in_progress',
+                'qr_identifier' => $workOrder->serviceContract->elevator->qr_identifier,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+
+        $this->assertNotNull($workOrder->fresh()->started_at);
+    }
+
+    public function test_technician_can_complete_an_in_progress_work_order_without_qr(): void
+    {
+        [$technician, $workOrder] = $this->createAssignedWorkOrderWithTechnician(status: 'in_progress');
+
+        $this->actingAs($technician)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", ['status' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'completed');
+    }
+
+    public function test_non_technician_can_start_a_work_order_without_qr(): void
+    {
+        [, $workOrder, $company] = $this->createAssignedWorkOrderWithTechnician();
+        $manager = User::factory()->create(['company_id' => $company->id]);
+        $manager->syncRoles(['Manager']);
+
+        $this->actingAs($manager)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", ['status' => 'in_progress'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_starting_technician_takes_over_the_assignment(): void
+    {
+        [, $workOrder, $company] = $this->createAssignedWorkOrderWithTechnician();
+        $otherTechnician = User::factory()->create(['company_id' => $company->id]);
+        $otherTechnician->syncRoles(['Technician']);
+
+        $this->actingAs($otherTechnician)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", [
+                'status' => 'in_progress',
+                'qr_identifier' => $workOrder->serviceContract->elevator->qr_identifier,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.assigned_user.uuid', $otherTechnician->uuid);
+
+        $this->assertDatabaseHas('work_orders', [
+            'id' => $workOrder->id,
+            'assigned_user_id' => $otherTechnician->id,
+        ]);
+    }
+
+    public function test_non_technician_start_keeps_the_existing_assignment(): void
+    {
+        [$technician, $workOrder, $company] = $this->createAssignedWorkOrderWithTechnician();
+        $manager = User::factory()->create(['company_id' => $company->id]);
+        $manager->syncRoles(['Manager']);
+
+        $this->actingAs($manager)
+            ->patchJson("/api/v1/work-orders/{$workOrder->uuid}", ['status' => 'in_progress'])
+            ->assertOk()
+            ->assertJsonPath('data.assigned_user.uuid', $technician->uuid);
+    }
+
+    /**
+     * @return array{0: User, 1: WorkOrder, 2: Company}
+     */
+    private function createAssignedWorkOrderWithTechnician(string $status = 'assigned'): array
+    {
+        $this->seed(DefaultRoleSeeder::class);
+
+        $company = Company::factory()->create();
+        $technician = User::factory()->create(['company_id' => $company->id]);
+        $technician->syncRoles(['Technician']);
+
+        $elevator = Elevator::factory()->create(['company_id' => $company->id]);
+        $serviceContract = ServiceContract::factory()->create(['elevator_id' => $elevator->id]);
+        $workOrder = WorkOrder::factory()->create([
+            'service_contract_id' => $serviceContract->id,
+            'status' => $status,
+            'assigned_user_id' => $technician->id,
+            'started_at' => $status === 'in_progress' ? now() : null,
+        ]);
+
+        return [$technician, $workOrder, $company];
     }
 
     public function test_deleting_another_companys_work_order_returns_not_found(): void

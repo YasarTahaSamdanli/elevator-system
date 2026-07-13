@@ -4,11 +4,9 @@ import {
   Boxes,
   ClipboardList,
   Loader2,
-  MoreHorizontal,
   PackagePlus,
   Pencil,
   Plus,
-  Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { DataTable, type Column } from "@/components/common/DataTable";
@@ -18,6 +16,9 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Pagination } from "@/components/common/Pagination";
 import { SearchInput } from "@/components/common/SearchInput";
 import { Toolbar } from "@/components/common/Toolbar";
+import { Field, FormErrorBanner } from "@/components/common/Field";
+import { ConfirmDeleteDialog, useConfirmDelete } from "@/components/common/ConfirmDeleteDialog";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,13 +28,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -60,6 +56,7 @@ import {
 } from "@/api/resources";
 import { ApiError } from "@/lib/api";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
+import { blankToNull, fieldError } from "@/lib/forms";
 import { cn } from "@/lib/utils";
 import { useDebounced, useList } from "@/hooks/useList";
 import type {
@@ -207,33 +204,6 @@ const movementColumns: Column<StockMovement>[] = [
   },
 ];
 
-function fieldError(errors: Record<string, string[]>, field: string) {
-  return errors[field]?.[0] ?? null;
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-danger-foreground">{error}</span>}
-    </label>
-  );
-}
-
-const blankToNull = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-};
-
 function MaterialDialog({
   open,
   material,
@@ -258,6 +228,7 @@ function MaterialDialog({
     category: null,
     min_stock_level: 0,
     default_unit_price: null,
+    default_sale_price: null,
     is_active: true,
     notes: null,
   });
@@ -273,6 +244,7 @@ function MaterialDialog({
             category: material.category,
             min_stock_level: material.min_stock_level,
             default_unit_price: material.default_unit_price,
+            default_sale_price: material.default_sale_price,
             is_active: material.is_active,
             notes: material.notes,
           }
@@ -283,6 +255,7 @@ function MaterialDialog({
             category: null,
             min_stock_level: 0,
             default_unit_price: null,
+            default_sale_price: null,
             is_active: true,
             notes: null,
           }
@@ -303,7 +276,7 @@ function MaterialDialog({
             void onSubmit(values);
           }}
         >
-          {formError && <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">{formError}</div>}
+          <FormErrorBanner message={formError} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Kod" error={fieldError(errors, "code")}>
               <Input value={values.code} onChange={(e) => setValues((p) => ({ ...p, code: e.target.value }))} />
@@ -320,19 +293,22 @@ function MaterialDialog({
           <Field label="Ad" error={fieldError(errors, "name")}>
             <Input value={values.name} onChange={(e) => setValues((p) => ({ ...p, name: e.target.value }))} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Kategori" error={fieldError(errors, "category")}>
               <Input value={values.category ?? ""} onChange={(e) => setValues((p) => ({ ...p, category: blankToNull(e.target.value) }))} />
             </Field>
             <Field label="Minimum Stok" error={fieldError(errors, "min_stock_level")}>
               <Input type="number" min="0" step="0.001" value={values.min_stock_level} onChange={(e) => setValues((p) => ({ ...p, min_stock_level: Number(e.target.value) }))} />
             </Field>
-            <Field label="Varsayılan Fiyat" error={fieldError(errors, "default_unit_price")}>
+            <Field label="Alış Fiyatı (maliyet)" error={fieldError(errors, "default_unit_price")}>
               <Input type="number" min="0" step="0.01" value={values.default_unit_price ?? ""} onChange={(e) => setValues((p) => ({ ...p, default_unit_price: e.target.value === "" ? null : Number(e.target.value) }))} />
+            </Field>
+            <Field label="Satış Fiyatı (müşteriye)" error={fieldError(errors, "default_sale_price")}>
+              <Input type="number" min="0" step="0.01" value={values.default_sale_price ?? ""} onChange={(e) => setValues((p) => ({ ...p, default_sale_price: e.target.value === "" ? null : Number(e.target.value) }))} />
             </Field>
           </div>
           <Field label="Notlar" error={fieldError(errors, "notes")}>
-            <textarea className="min-h-20 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm shadow-xs" value={values.notes ?? ""} onChange={(e) => setValues((p) => ({ ...p, notes: blankToNull(e.target.value) }))} />
+            <Textarea value={values.notes ?? ""} onChange={(e) => setValues((p) => ({ ...p, notes: blankToNull(e.target.value) }))} />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>Vazgeç</Button>
@@ -378,7 +354,7 @@ function WarehouseDialog({
           <DialogDescription>Faz 2 merkez depo ile başlar; araç depoları için şema hazır.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSubmit(values); }}>
-          {formError && <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">{formError}</div>}
+          <FormErrorBanner message={formError} />
           <Field label="Depo Adı" error={fieldError(errors, "name")}>
             <Input value={values.name} onChange={(e) => setValues((p) => ({ ...p, name: e.target.value }))} />
           </Field>
@@ -466,7 +442,7 @@ function ReceiptDialog({
           <DialogDescription>Giriş hareketi deftere eklenir; silme yerine ters kayıt mantığı korunur.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSubmit(values); }}>
-          {formError && <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">{formError}</div>}
+          <FormErrorBanner message={formError} />
           <Field label="Malzeme" error={fieldError(errors, "material_uuid")}>
             <Select value={values.material_uuid || undefined} onValueChange={(material_uuid) => setValues((p) => ({ ...p, material_uuid }))}>
               <SelectTrigger><SelectValue placeholder="Malzeme seç" /></SelectTrigger>
@@ -552,7 +528,7 @@ function TransferDialog({
           <DialogDescription>Çıkış ve giriş hareketleri aynı transfer numarasıyla deftere yazılır.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSubmit(values); }}>
-          {formError && <div className="rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-foreground">{formError}</div>}
+          <FormErrorBanner message={formError} />
           <Field label="Malzeme" error={fieldError(errors, "material_uuid")}>
             <Select value={values.material_uuid || undefined} onValueChange={(material_uuid) => setValues((p) => ({ ...p, material_uuid }))}>
               <SelectTrigger><SelectValue placeholder="Malzeme seç" /></SelectTrigger>
@@ -607,7 +583,7 @@ export function InventoryPage() {
   const [transferDialogOpen, setTransferDialogOpen] = React.useState(false);
   const [editingMaterial, setEditingMaterial] = React.useState<Material | null>(null);
   const [editingWarehouse, setEditingWarehouse] = React.useState<Warehouse | null>(null);
-  const [deletingMaterial, setDeletingMaterial] = React.useState<Material | null>(null);
+  const del = useConfirmDelete<Material>();
   const [errors, setErrors] = React.useState<Record<string, string[]>>({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isSubmitting, setSubmitting] = React.useState(false);
@@ -682,13 +658,11 @@ export function InventoryPage() {
             getRowId={(m) => m.id}
             isLoading={isLoading}
             rowActions={(material) => (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Malzeme işlemleri"><MoreHorizontal /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => { resetFormState(); setEditingMaterial(material); setMaterialDialogOpen(true); }}><Pencil className="size-4" />Düzenle</DropdownMenuItem>
-                  <DropdownMenuItem className="text-danger focus:text-danger" onSelect={() => setDeletingMaterial(material)}><Trash2 className="size-4" />Sil</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <RowActionsMenu
+                ariaLabel="Malzeme işlemleri"
+                onEdit={() => { resetFormState(); setEditingMaterial(material); setMaterialDialogOpen(true); }}
+                onDelete={() => del.request(material)}
+              />
             )}
             empty={<EmptyState icon={Boxes} title="Malzeme yok" description="Katalog için ilk malzemeyi ekle." />}
           />
@@ -791,23 +765,21 @@ export function InventoryPage() {
         })}
       />
 
-      <Dialog open={!!deletingMaterial} onOpenChange={(open) => !open && setDeletingMaterial(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Malzemeyi Sil</DialogTitle>
-            <DialogDescription>{deletingMaterial ? `${deletingMaterial.code} kodlu malzeme katalogdan kaldırılacak.` : ""}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingMaterial(null)}>Vazgeç</Button>
-            <Button variant="destructive" onClick={() => submit(async () => {
-              if (!deletingMaterial) return;
-              await deleteMaterial(deletingMaterial.id);
-              setDeletingMaterial(null);
-              reloadMaterials();
-            })}>Sil</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDeleteDialog
+        open={!!del.target}
+        title="Malzemeyi Sil"
+        description={del.target ? `${del.target.code} kodlu malzeme katalogdan kaldırılacak.` : ""}
+        error={del.error}
+        isDeleting={del.isDeleting}
+        onClose={del.close}
+        onConfirm={() =>
+          void del.confirm(async () => {
+            if (!del.target) return;
+            await deleteMaterial(del.target.id);
+            reloadMaterials();
+          })
+        }
+      />
     </div>
   );
 }

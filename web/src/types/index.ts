@@ -44,6 +44,11 @@ export type StockMovementType =
   | "adjustment_in"
   | "adjustment_out";
 
+/** Periodic inspection label colors (Asansör Periyodik Kontrol Yönetmeliği). */
+export type InspectionLabel = "green" | "blue" | "yellow" | "red";
+
+export type InspectionType = "periodic" | "follow_up";
+
 export type UserRole =
   | "Super Admin"
   | "Company Owner"
@@ -109,7 +114,81 @@ export interface Elevator {
   stop_count: number | null;
   registration_number: string | null;
   status: ElevatorStatus;
+  /** Snapshot of the latest inspection (server-maintained cache). */
+  current_label: InspectionLabel | null;
+  last_inspection_at: ISODate | null;
+  next_inspection_due: ISODate | null;
+  follow_up_due: ISODate | null;
   notes: string | null;
+}
+
+export interface InspectionFinding {
+  id: UUID;
+  description: string;
+  is_resolved: boolean;
+}
+
+export interface ElevatorInspection {
+  id: UUID;
+  elevator_id: UUID;
+  elevator_name: string;
+  building_name: string;
+  type: InspectionType;
+  inspection_body: string | null;
+  inspected_at: ISODate;
+  label: InspectionLabel;
+  report_number: string | null;
+  follow_up_due_date: ISODate | null;
+  next_inspection_date: ISODate | null;
+  work_order: Pick<WorkOrder, "id" | "work_order_number" | "status"> | null;
+  findings: InspectionFinding[];
+  notes: string | null;
+}
+
+export type InspectionImportStatus =
+  | "pending"
+  | "imported"
+  | "needs_review"
+  | "ignored"
+  | "failed";
+
+export type InspectionImportReviewReason =
+  | "parse_failed"
+  | "no_text_layer"
+  | "elevator_not_found"
+  | "multiple_matches"
+  | "duplicate_report";
+
+/** A report PDF picked up from the RoyalCert mailbox (or uploaded manually). */
+export interface InspectionImport {
+  id: UUID;
+  source: "email" | "upload";
+  status: InspectionImportStatus;
+  review_reason: InspectionImportReviewReason | null;
+  error_message: string | null;
+  /** Auto work-order guard failure (import itself succeeded). */
+  work_order_error: string | null;
+  mail_from: string | null;
+  mail_subject: string | null;
+  mail_received_at: string | null;
+  original_filename: string | null;
+  report_number: string | null;
+  parsed_label: InspectionLabel | null;
+  parsed_type: InspectionType | null;
+  parsed_identity: string | null;
+  parsed_findings: string[];
+  parsed_warnings: string[];
+  matched_via: string | null;
+  elevator_id: UUID | null;
+  elevator_name: string | null;
+  building_name: string | null;
+  inspection: {
+    id: UUID;
+    label: InspectionLabel;
+    inspected_at: ISODate | null;
+    work_order: Pick<WorkOrder, "id" | "work_order_number" | "status"> | null;
+  } | null;
+  created_at: string;
 }
 
 export interface ServiceContract {
@@ -173,6 +252,8 @@ export interface Material {
   category: string | null;
   min_stock_level: number;
   default_unit_price: number | null;
+  /** Müşteriye yansıtılan varsayılan satış fiyatı (maliyetten ayrı). */
+  default_sale_price: number | null;
   stock_on_hand: number;
   is_active: boolean;
   notes: string | null;
@@ -198,6 +279,44 @@ export interface StockMovement {
   occurred_at: ISODateTime;
   created_by: Pick<User, "id" | "name"> | null;
   note: string | null;
+}
+
+export type AccountTransactionType =
+  | "opening_balance"
+  | "maintenance_fee"
+  | "part_charge"
+  | "revision_charge"
+  | "adjustment_charge"
+  | "payment"
+  | "adjustment_credit";
+
+export interface PaymentMethod {
+  id: UUID;
+  name: string;
+  is_active: boolean;
+}
+
+export interface AccountTransaction {
+  id: UUID;
+  building: { id: UUID; name: string };
+  elevator: { id: UUID; name: string | null; serial_number: string | null } | null;
+  type: AccountTransactionType;
+  amount: number;
+  signed_amount: number;
+  occurred_at: ISODate;
+  work_order: { id: UUID; work_order_number: string } | null;
+  payment_method: { id: UUID; name: string } | null;
+  collected_by: { id: UUID; name: string } | null;
+  payer_name: string | null;
+  description: string | null;
+  created_at: ISODateTime;
+}
+
+export interface AccountSummary {
+  totals: Record<AccountTransactionType, number>;
+  charges_total: number;
+  credits_total: number;
+  balance: number;
 }
 
 export interface AppNotification {

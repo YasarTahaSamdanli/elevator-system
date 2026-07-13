@@ -27,6 +27,7 @@ class StoreMaterialRequest extends FormRequest
             'category' => ['nullable', 'string', 'max:100'],
             'min_stock_level' => ['nullable', 'numeric', 'min:0'],
             'default_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'default_sale_price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string'],
         ];

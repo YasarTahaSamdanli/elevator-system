@@ -22,14 +22,26 @@ class ElevatorController extends Controller
             ->filterable([
                 'status',
                 'manufacturer',
+                'current_label',
+                // Exact match for the field QR flow: scan → resolve elevator.
+                'qr_identifier',
                 'building_uuid' => fn (Builder $query, mixed $value) => $query->whereHas(
                     'building',
                     fn (Builder $building) => $building->where('uuid', $value),
                 ),
             ])
-            ->searchable(['serial_number', 'qr_identifier', 'name', 'manufacturer', 'model'])
-            ->sortable(['serial_number', 'name', 'manufacturer', 'status', 'installation_year', 'created_at', 'updated_at'])
-            ->dateRange('created_at')
+            ->searchable([
+                'serial_number',
+                'qr_identifier',
+                'name',
+                'manufacturer',
+                'model',
+                'registration_number',
+                'notes',
+                'building' => ['name', 'code', 'address', 'city', 'district', 'manager_name', 'manager_phone'],
+            ])
+            ->sortable(['serial_number', 'name', 'manufacturer', 'status', 'installation_year', 'last_inspection_at', 'next_inspection_due', 'follow_up_due', 'created_at', 'updated_at'])
+            ->dateRange('next_inspection_due', 'follow_up_due', 'created_at')
             ->paginate();
 
         return ApiResponse::paginated($elevators, ElevatorResource::class);
