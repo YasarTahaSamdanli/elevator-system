@@ -113,6 +113,8 @@ interface BuildingFormValues {
   district: string;
   manager_name: string;
   manager_phone: string;
+  entrance_code: string;
+  access_notes: string;
   latitude: string;
   longitude: string;
   is_active: "true" | "false";
@@ -127,6 +129,8 @@ const emptyForm: BuildingFormValues = {
   district: "",
   manager_name: "",
   manager_phone: "",
+  entrance_code: "",
+  access_notes: "",
   latitude: "",
   longitude: "",
   is_active: "true",
@@ -144,6 +148,8 @@ function formFromBuilding(building: Building | null): BuildingFormValues {
     district: building.district,
     manager_name: building.manager_name ?? "",
     manager_phone: building.manager_phone ?? "",
+    entrance_code: building.entrance_code ?? "",
+    access_notes: building.access_notes ?? "",
     latitude: building.latitude == null ? "" : String(building.latitude),
     longitude: building.longitude == null ? "" : String(building.longitude),
     is_active: building.is_active ? "true" : "false",
@@ -160,6 +166,8 @@ function formToInput(values: BuildingFormValues): BuildingInput {
     district: values.district.trim(),
     manager_name: blankToNull(values.manager_name),
     manager_phone: blankToNull(values.manager_phone),
+    entrance_code: blankToNull(values.entrance_code),
+    access_notes: blankToNull(values.access_notes),
     latitude: numericOrNull(values.latitude),
     longitude: numericOrNull(values.longitude),
     is_active: values.is_active === "true",
@@ -267,6 +275,22 @@ function BuildingFormDialog({
               <Input
                 value={values.manager_phone}
                 onChange={(event) => setValue("manager_phone", event.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Kapı Şifresi" error={fieldError(errors, "entrance_code")}>
+              <Input
+                value={values.entrance_code}
+                onChange={(event) => setValue("entrance_code", event.target.value)}
+              />
+            </Field>
+            <Field label="Giriş Notu" error={fieldError(errors, "access_notes")}>
+              <Input
+                value={values.access_notes}
+                onChange={(event) => setValue("access_notes", event.target.value)}
+                placeholder="Arka giriş, bodrum kat vb."
               />
             </Field>
           </div>

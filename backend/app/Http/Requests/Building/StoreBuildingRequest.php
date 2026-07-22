@@ -32,6 +32,8 @@ class StoreBuildingRequest extends FormRequest
             'district' => ['required', 'string', 'max:100'],
             'manager_name' => ['nullable', 'string', 'max:150'],
             'manager_phone' => ['nullable', 'string', 'max:30'],
+            'entrance_code' => ['nullable', 'string', 'max:50'],
+            'access_notes' => ['nullable', 'string'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'is_active' => ['sometimes', 'boolean'],

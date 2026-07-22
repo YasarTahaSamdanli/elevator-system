@@ -37,6 +37,8 @@ class Building extends Model
         'district',
         'manager_name',
         'manager_phone',
+        'entrance_code',
+        'access_notes',
         'latitude',
         'longitude',
         'is_active',

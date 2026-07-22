@@ -9,6 +9,7 @@ class WorkOrder {
     required this.status,
     required this.priority,
     this.buildingName,
+    this.location,
     this.elevatorName,
     this.elevatorSerialNumber,
     this.contractNumber,
@@ -37,6 +38,7 @@ class WorkOrder {
       status: json['status'] as String,
       priority: json['priority'] as String? ?? 'normal',
       buildingName: nested('building')?['name'] as String?,
+      location: BuildingLocation.fromJson(nested('building')),
       elevatorName: nested('elevator')?['name'] as String?,
       elevatorSerialNumber: nested('elevator')?['serial_number'] as String?,
       contractNumber: nested('service_contract')?['contract_number'] as String?,
@@ -63,6 +65,9 @@ class WorkOrder {
   final String status;
   final String priority;
   final String? buildingName;
+
+  /// Sahaya gidiş için adres + erişim bilgileri; bina bilgisi yoksa null.
+  final BuildingLocation? location;
   final String? elevatorName;
   final String? elevatorSerialNumber;
   final String? contractNumber;
@@ -127,6 +132,108 @@ class WorkOrder {
         'in_progress' => (status: 'completed', label: 'Tamamla'),
         _ => null,
       };
+}
+
+/// İş emrinin ait olduğu binanın saha erişim bilgileri: yazılı adres, kapı
+/// şifresi ve varsa koordinat. Koordinat yoksa yol tarifi adres metniyle
+/// açılır (bina kaydında konum seçilmemiş olabilir).
+class BuildingLocation {
+  const BuildingLocation({
+    this.name,
+    this.address,
+    this.city,
+    this.district,
+    this.managerName,
+    this.managerPhone,
+    this.entranceCode,
+    this.accessNotes,
+    this.latitude,
+    this.longitude,
+  });
+
+  /// `building` bloğu yoksa ya da tümüyle boşsa null döner; çağıran taraf
+  /// bu durumda konum bölümünü hiç göstermez.
+  static BuildingLocation? fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return null;
+    }
+
+    String? text(String key) {
+      final value = json[key];
+      if (value is! String) {
+        return null;
+      }
+
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    // latitude/longitude backend'de decimal cast'lendiği için string gelir.
+    double? coordinate(String key) {
+      final value = json[key];
+      if (value is num) {
+        return value.toDouble();
+      }
+
+      return value is String ? double.tryParse(value) : null;
+    }
+
+    final location = BuildingLocation(
+      name: text('name'),
+      address: text('address'),
+      city: text('city'),
+      district: text('district'),
+      managerName: text('manager_name'),
+      managerPhone: text('manager_phone'),
+      entranceCode: text('entrance_code'),
+      accessNotes: text('access_notes'),
+      latitude: coordinate('latitude'),
+      longitude: coordinate('longitude'),
+    );
+
+    return location.hasAnyDetail ? location : null;
+  }
+
+  final String? name;
+  final String? address;
+  final String? city;
+  final String? district;
+  final String? managerName;
+  final String? managerPhone;
+  final String? entranceCode;
+  final String? accessNotes;
+  final double? latitude;
+  final double? longitude;
+
+  bool get hasCoordinates => latitude != null && longitude != null;
+
+  bool get hasAnyDetail =>
+      address != null ||
+      city != null ||
+      district != null ||
+      entranceCode != null ||
+      accessNotes != null ||
+      managerPhone != null ||
+      hasCoordinates;
+
+  /// Yol tarifi/başlık için tek satırlık adres: "Adres, İlçe, Şehir".
+  String get fullAddress => [address, district, city]
+      .whereType<String>()
+      .toSet()
+      .join(', ');
+
+  /// Harita uygulamasına verilecek hedef: koordinat varsa o, yoksa adres
+  /// metni (adres de yoksa bina adı) ile arama yapılır.
+  String get navigationQuery {
+    if (hasCoordinates) {
+      return '$latitude,$longitude';
+    }
+
+    final address = fullAddress;
+    return address.isNotEmpty ? address : (name ?? '');
+  }
+
+  bool get canNavigate => navigationQuery.isNotEmpty;
 }
 
 class WorkOrderChecklistItem {

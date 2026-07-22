@@ -27,6 +27,8 @@ class BuildingFactory extends Factory
             'district' => fake()->citySuffix(),
             'manager_name' => fake()->optional()->name(),
             'manager_phone' => fake()->optional()->phoneNumber(),
+            'entrance_code' => fake()->optional()->numerify('####'),
+            'access_notes' => fake()->optional()->sentence(),
             'latitude' => fake()->optional()->latitude(),
             'longitude' => fake()->optional()->longitude(),
             'is_active' => true,

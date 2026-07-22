@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../data/work_order_repository.dart';
 import '../domain/work_order.dart';
 import 'qr_scan_page.dart';
+import 'work_order_location_sheet.dart';
 import 'work_orders_providers.dart';
 
 class WorkOrderDetailPage extends ConsumerStatefulWidget {
@@ -255,6 +256,8 @@ class _WorkOrderDetailPageState extends ConsumerState<WorkOrderDetailPage> {
                 _row('Seri No', workOrder.elevatorSerialNumber!),
               if (workOrder.contractNumber != null)
                 _row('Sözleşme', workOrder.contractNumber!),
+              if (workOrder.location != null)
+                _locationButton(context, workOrder.location!),
             ]),
             _section(context, 'Zamanlama', [
               if (workOrder.scheduledAt != null)
@@ -593,6 +596,33 @@ class _WorkOrderDetailPageState extends ConsumerState<WorkOrderDetailPage> {
                   : const Icon(Icons.delete_outline),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Adres/kapı şifresi ve yol tarifi tek dokunuşla açılsın diye detay
+  /// ekranında ayrı bir alt sayfaya çıkarıldı; kart içinde satır satır
+  /// göstermek sahada okunması zor bir liste yaratıyordu.
+  Widget _locationButton(BuildContext context, BuildingLocation location) {
+    final address = location.fullAddress;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: OutlinedButton.icon(
+        onPressed: () => WorkOrderLocationSheet.show(context, location),
+        icon: const Icon(Icons.place_outlined),
+        label: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            address.isEmpty ? 'Konum Bilgileri' : address,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          alignment: Alignment.centerLeft,
+        ),
       ),
     );
   }

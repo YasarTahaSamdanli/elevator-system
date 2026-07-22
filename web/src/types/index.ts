@@ -90,6 +90,9 @@ export interface Building {
   district: string;
   manager_name: string | null;
   manager_phone: string | null;
+  /** Kapı/dış kapı şifresi — teknisyen mobilde konum ekranında görür */
+  entrance_code: string | null;
+  access_notes: string | null;
   latitude: number | null;
   longitude: number | null;
   is_active: boolean;

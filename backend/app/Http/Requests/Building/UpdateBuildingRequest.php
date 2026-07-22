@@ -38,6 +38,8 @@ class UpdateBuildingRequest extends FormRequest
             'district' => ['sometimes', 'required', 'string', 'max:100'],
             'manager_name' => ['sometimes', 'nullable', 'string', 'max:150'],
             'manager_phone' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'entrance_code' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'access_notes' => ['sometimes', 'nullable', 'string'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'is_active' => ['sometimes', 'boolean'],

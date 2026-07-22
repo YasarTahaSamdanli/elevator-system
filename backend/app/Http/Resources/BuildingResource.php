@@ -23,6 +23,8 @@ class BuildingResource extends JsonResource
             'district' => $this->district,
             'manager_name' => $this->manager_name,
             'manager_phone' => $this->manager_phone,
+            'entrance_code' => $this->entrance_code,
+            'access_notes' => $this->access_notes,
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
             'is_active' => $this->is_active,

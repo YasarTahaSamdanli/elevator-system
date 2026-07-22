@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Building;
 use App\Models\Company;
 use App\Models\Elevator;
 use App\Models\Material;
@@ -81,6 +82,39 @@ class WorkOrderControllerTest extends TestCase
             ->assertJsonPath('data.type', 'fault')
             ->assertJsonPath('data.work_order_number', $workOrder->work_order_number)
             ->assertJsonPath('data.service_contract.uuid', $serviceContract->uuid);
+    }
+
+    public function test_work_order_payload_carries_building_navigation_details(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $building = Building::factory()->create([
+            'company_id' => $company->id,
+            'address' => 'Atatürk Cad. No 12',
+            'city' => 'İstanbul',
+            'district' => 'Kadıköy',
+            'entrance_code' => '4821',
+            'access_notes' => 'Arka bahçe kapısı',
+            'latitude' => 40.9901234,
+            'longitude' => 29.0281234,
+        ]);
+        $elevator = Elevator::factory()->create([
+            'company_id' => $company->id,
+            'building_id' => $building->id,
+        ]);
+        $serviceContract = ServiceContract::factory()->create(['elevator_id' => $elevator->id]);
+        $workOrder = WorkOrder::factory()->create(['service_contract_id' => $serviceContract->id]);
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/work-orders/{$workOrder->uuid}")
+            ->assertOk()
+            ->assertJsonPath('data.building.address', 'Atatürk Cad. No 12')
+            ->assertJsonPath('data.building.district', 'Kadıköy')
+            ->assertJsonPath('data.building.city', 'İstanbul')
+            ->assertJsonPath('data.building.entrance_code', '4821')
+            ->assertJsonPath('data.building.access_notes', 'Arka bahçe kapısı')
+            ->assertJsonPath('data.building.latitude', '40.9901234')
+            ->assertJsonPath('data.building.longitude', '29.0281234');
     }
 
     public function test_viewing_another_companys_work_order_returns_not_found(): void

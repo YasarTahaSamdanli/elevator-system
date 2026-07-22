@@ -46,6 +46,8 @@ interface BuildingPayload {
   district: string;
   manager_name: string | null;
   manager_phone: string | null;
+  entrance_code: string | null;
+  access_notes: string | null;
   latitude: string | number | null;
   longitude: string | number | null;
   is_active: boolean;
@@ -61,6 +63,8 @@ export interface BuildingInput {
   district: string;
   manager_name: string | null;
   manager_phone: string | null;
+  entrance_code: string | null;
+  access_notes: string | null;
   latitude: number | null;
   longitude: number | null;
   is_active: boolean;
@@ -244,6 +248,8 @@ function mapBuilding(p: BuildingPayload): Building {
     district: p.district,
     manager_name: p.manager_name,
     manager_phone: p.manager_phone,
+    entrance_code: p.entrance_code,
+    access_notes: p.access_notes,
     latitude: num(p.latitude),
     longitude: num(p.longitude),
     is_active: p.is_active,
