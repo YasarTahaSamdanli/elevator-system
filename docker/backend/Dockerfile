@@ -6,11 +6,13 @@ RUN apk add --no-cache \
         libpq \
         postgresql-client \
         unzip \
+        libzip \
     && apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         libpq-dev \
+        libzip-dev \
         linux-headers \
-    && docker-php-ext-install pcntl pdo_pgsql \
+    && docker-php-ext-install pcntl pdo_pgsql zip \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps

@@ -103,7 +103,7 @@ class DemoDataSeeder extends Seeder
         }
 
         $statuses = ['planned', 'assigned', 'in_progress', 'completed', 'draft', 'completed'];
-        $types = ['maintenance', 'fault', 'inspection', 'repair', 'maintenance', 'modernization'];
+        $types = ['maintenance', 'fault', 'inspection', 'repair', 'maintenance', 'repair'];
         $priorities = ['normal', 'high', 'critical', 'normal', 'low', 'high'];
 
         foreach (array_slice($elevators, 0, 3) as $i => $elevator) {

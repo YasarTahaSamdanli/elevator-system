@@ -148,27 +148,37 @@ class ElevatorInspectionControllerTest extends TestCase
         $this->assertSame('red', $elevator->current_label);
         $this->assertSame('2026-07-01', $elevator->last_inspection_at->toDateString());
         $this->assertSame('2027-07-01', $elevator->next_inspection_due->toDateString());
-        // Red label: follow-up suggested 30 days after the inspection.
-        $this->assertSame('2026-07-31', $elevator->follow_up_due->toDateString());
+        // Red label: follow-up suggested 60 days after the inspection
+        // (EK 7: GÜVENSİZ → 60 gün).
+        $this->assertSame('2026-08-30', $elevator->follow_up_due->toDateString());
     }
 
-    public function test_red_label_suggests_follow_up_in_30_days_and_yellow_in_60(): void
+    public function test_follow_up_windows_match_the_ek7_form_per_label(): void
     {
         $company = Company::factory()->create();
         $user = User::factory()->create(['company_id' => $company->id]);
         $elevator = Elevator::factory()->create(['company_id' => $company->id]);
 
+        // GÜVENSİZ (red) → 60 gün
         $this->actingAs($user)->postJson('/api/v1/elevator-inspections', [
             'elevator_uuid' => $elevator->uuid,
             'inspected_at' => '2026-01-01',
             'label' => 'red',
-        ])->assertCreated()->assertJsonPath('data.follow_up_due_date', '2026-01-31');
+        ])->assertCreated()->assertJsonPath('data.follow_up_due_date', '2026-03-02');
 
+        // KUSURLU (yellow) → 120 gün
         $this->actingAs($user)->postJson('/api/v1/elevator-inspections', [
             'elevator_uuid' => $elevator->uuid,
             'inspected_at' => '2026-01-01',
             'label' => 'yellow',
-        ])->assertCreated()->assertJsonPath('data.follow_up_due_date', '2026-03-02');
+        ])->assertCreated()->assertJsonPath('data.follow_up_due_date', '2026-05-01');
+
+        // HAFİF KUSURLU (blue) → 12 ay
+        $this->actingAs($user)->postJson('/api/v1/elevator-inspections', [
+            'elevator_uuid' => $elevator->uuid,
+            'inspected_at' => '2026-01-01',
+            'label' => 'blue',
+        ])->assertCreated()->assertJsonPath('data.follow_up_due_date', '2027-01-01');
 
         $this->actingAs($user)->postJson('/api/v1/elevator-inspections', [
             'elevator_uuid' => $elevator->uuid,
@@ -358,6 +368,49 @@ class ElevatorInspectionControllerTest extends TestCase
         $this->assertSame($company->id, $workOrder->company_id);
         // Only the 2 unresolved findings become checklist items.
         $this->assertCount(2, $workOrder->checklistItems);
+    }
+
+    public function test_work_order_checklist_is_ordered_like_the_paper_report(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $elevator = Elevator::factory()->create(['company_id' => $company->id]);
+        ServiceContract::factory()->create(['elevator_id' => $elevator->id, 'status' => 'active']);
+        $inspection = ElevatorInspection::factory()->label('red')->create(['elevator_id' => $elevator->id]);
+
+        // Created deliberately out of report order.
+        InspectionFinding::factory()->create([
+            'elevator_inspection_id' => $inspection->id,
+            'description' => 'Mavi eksik',
+            'severity' => 'blue',
+            'item_code' => '1.1.2',
+            'position' => 10,
+        ]);
+        InspectionFinding::factory()->create([
+            'elevator_inspection_id' => $inspection->id,
+            'description' => 'Sarı eksik',
+            'severity' => 'yellow',
+            'item_code' => '1.3.1',
+            'position' => 4,
+        ]);
+        InspectionFinding::factory()->create([
+            'elevator_inspection_id' => $inspection->id,
+            'description' => 'Kırmızı eksik',
+            'severity' => 'red',
+            'item_code' => '2.7.8',
+            'position' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/elevator-inspections/{$inspection->uuid}/work-order")
+            ->assertCreated();
+
+        $items = $inspection->refresh()->workOrder->checklistItems()->orderBy('position')->get();
+
+        // Red first, then yellow, then blue — like the paper's sections.
+        $this->assertSame(['red', 'yellow', 'blue'], $items->pluck('severity')->all());
+        $this->assertSame(['Kırmızı eksik', 'Sarı eksik', 'Mavi eksik'], $items->pluck('label')->all());
+        $this->assertSame(['2.7.8', '1.3.1', '1.1.2'], $items->pluck('item_code')->all());
     }
 
     public function test_creating_a_work_order_twice_for_the_same_inspection_fails(): void

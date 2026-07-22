@@ -162,7 +162,7 @@ function MatchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Raporu Asansörle Eşleştir</DialogTitle>
           <DialogDescription>
@@ -176,8 +176,10 @@ function MatchDialog({
 
         {target?.parsed_findings.length ? (
           <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 font-medium text-foreground">Rapordaki kusurlar</div>
-            <ul className="list-inside list-disc space-y-0.5">
+            <div className="mb-1 font-medium text-foreground">
+              Rapordaki kusurlar ({target.parsed_findings.length})
+            </div>
+            <ul className="max-h-40 list-inside list-disc space-y-0.5 overflow-y-auto pr-1">
               {target.parsed_findings.map((f, idx) => (
                 <li key={idx}>{f}</li>
               ))}

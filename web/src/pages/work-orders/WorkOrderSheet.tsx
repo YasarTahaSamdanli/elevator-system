@@ -31,6 +31,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  checklistSeverityMeta,
   workOrderPriorityMeta,
   workOrderStatusMeta,
   workOrderTypeMeta,
@@ -48,6 +49,7 @@ import {
 import { useList } from "@/hooks/useList";
 import { ApiError } from "@/lib/api";
 import type {
+  ChecklistSeverity,
   Material,
   WorkOrder,
   WorkOrderChecklistItem,
@@ -99,6 +101,25 @@ function TimelineItem({
       </div>
     </div>
   );
+}
+
+/**
+ * Group checklist items by defect colour, in the report's section order
+ * (kırmızı → sarı → mavi), so the work order reads like the paper report.
+ * Items without a severity (template checklists, hand-added) come last;
+ * when no item has a severity the list renders flat, without headers.
+ */
+function checklistGroups(checklist: WorkOrderChecklistItem[]) {
+  const order: (ChecklistSeverity | null)[] = ["red", "yellow", "blue", null];
+  const hasSeverity = checklist.some((item) => item.severity !== null);
+
+  return order
+    .map((severity) => ({
+      key: severity ?? "other",
+      meta: severity && hasSeverity ? checklistSeverityMeta[severity] : null,
+      items: checklist.filter((item) => item.severity === severity),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 /** The forward transition offered as the primary quick action per status. */
@@ -349,30 +370,48 @@ export function WorkOrderSheet({
                       {doneCount}/{checklist.length}
                     </span>
                   </div>
-                  <div className="space-y-0.5">
-                    {checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => void toggleItem(item)}
-                        className="flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
-                      >
-                        {item.is_done ? (
-                          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
-                        ) : (
-                          <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        )}
-                        <span
-                          className={cn(
-                            "leading-5",
-                            item.is_done && "text-muted-foreground line-through"
-                          )}
+                  {checklistGroups(checklist).map((group) => (
+                    <div key={group.key} className="space-y-0.5">
+                      {group.meta && (
+                        <div className="flex items-baseline justify-between px-2 pt-1">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                            <span className={cn("size-2 rounded-full", group.meta.dot)} />
+                            {group.meta.label}
+                          </div>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {group.items.filter((item) => item.is_done).length}/{group.items.length}
+                          </span>
+                        </div>
+                      )}
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => void toggleItem(item)}
+                          className="flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
                         >
-                          {item.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                          {item.is_done ? (
+                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                          ) : (
+                            <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span
+                            className={cn(
+                              "leading-5",
+                              item.is_done && "text-muted-foreground line-through"
+                            )}
+                          >
+                            {item.item_code && (
+                              <span className="mr-1.5 font-mono text-xs text-muted-foreground">
+                                {item.item_code}
+                              </span>
+                            )}
+                            {item.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
                 </section>
               )}
 

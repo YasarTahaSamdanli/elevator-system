@@ -18,7 +18,6 @@ export type WorkOrderType =
   | "maintenance"
   | "fault"
   | "inspection"
-  | "modernization"
   | "repair";
 
 export type WorkOrderStatus =
@@ -204,10 +203,18 @@ export interface ServiceContract {
   notes: string | null;
 }
 
+/**
+ * Defect colour from the inspection report (EK 7 colour sections);
+ * null for checklist items that don't come from an inspection.
+ */
+export type ChecklistSeverity = "red" | "yellow" | "blue";
+
 export interface WorkOrderChecklistItem {
   id: UUID;
   position: number;
   label: string;
+  severity: ChecklistSeverity | null;
+  item_code: string | null;
   is_done: boolean;
   note: string | null;
 }

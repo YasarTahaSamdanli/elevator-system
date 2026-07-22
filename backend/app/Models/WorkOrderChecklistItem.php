@@ -26,6 +26,8 @@ class WorkOrderChecklistItem extends Model
         'work_order_id',
         'position',
         'label',
+        'severity',
+        'item_code',
         'is_done',
         'note',
     ];

@@ -2,7 +2,7 @@
  * Chart palettes — validated with the dataviz skill's validator against the
  * app's own light (#ffffff) and dark (#15151a) chart surfaces.
  *
- * Categorical order is FIXED (never cycled): blue, aqua, yellow, green, violet.
+ * Categorical order is FIXED (never cycled): blue, aqua, yellow, green.
  * Donuts/legends always render text labels, which is the required relief for the
  * sub-3:1 (light) / floor-band CVD (dark) slots.
  */
@@ -21,7 +21,7 @@ export interface ChartPalette {
 }
 
 const light: ChartPalette = {
-  categorical: ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7"],
+  categorical: ["#2a78d6", "#1baf7a", "#eda100", "#008300"],
   accent: "#2563eb",
   accentFill: "#2563eb",
   grid: "#e4e4e7",
@@ -32,7 +32,7 @@ const light: ChartPalette = {
 };
 
 const dark: ChartPalette = {
-  categorical: ["#3987e5", "#199e70", "#c98500", "#008300", "#9085e9"],
+  categorical: ["#3987e5", "#199e70", "#c98500", "#008300"],
   accent: "#3b82f6",
   accentFill: "#3b82f6",
   grid: "#27272a",
@@ -52,5 +52,4 @@ export const workOrderTypeOrder: WorkOrderType[] = [
   "fault",
   "inspection",
   "repair",
-  "modernization",
 ];

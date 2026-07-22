@@ -124,6 +124,8 @@ interface ChecklistItemPayload {
   uuid: string;
   position: number;
   label: string;
+  severity: "red" | "yellow" | "blue" | null;
+  item_code: string | null;
   is_done: boolean;
   note: string | null;
 }
@@ -336,6 +338,8 @@ function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
       id: item.uuid,
       position: item.position,
       label: item.label,
+      severity: item.severity ?? null,
+      item_code: item.item_code ?? null,
       is_done: item.is_done,
       note: item.note,
     })),
@@ -931,7 +935,17 @@ interface InspectionImportPayload {
     label?: InspectionImport["parsed_label"];
     type?: InspectionImport["parsed_type"];
     identity?: string | null;
-    findings?: string[];
+    /** Structured since the EK 7 parser; plain strings on older imports. */
+    findings?: (
+      | string
+      | {
+          severity: "red" | "yellow" | "blue";
+          position: number;
+          item_code: string;
+          description: string;
+          measurement: string | null;
+        }
+    )[];
     warnings?: string[];
   } | null;
   matched_via: string | null;
@@ -961,7 +975,13 @@ function mapInspectionImport(p: InspectionImportPayload): InspectionImport {
     parsed_label: p.parsed_payload?.label ?? null,
     parsed_type: p.parsed_payload?.type ?? null,
     parsed_identity: p.parsed_payload?.identity ?? null,
-    parsed_findings: p.parsed_payload?.findings ?? [],
+    parsed_findings: (p.parsed_payload?.findings ?? []).map((f) =>
+      typeof f === "string"
+        ? f
+        : [f.item_code, f.description, f.measurement ? `(Ölç: ${f.measurement})` : null]
+            .filter(Boolean)
+            .join(" ")
+    ),
     parsed_warnings: p.parsed_payload?.warnings ?? [],
     matched_via: p.matched_via,
     elevator_id: p.elevator?.uuid ?? null,

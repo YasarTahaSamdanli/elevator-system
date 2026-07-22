@@ -5,6 +5,7 @@
  */
 import type {
   AccountTransactionType,
+  ChecklistSeverity,
   ContractStatus,
   ElevatorStatus,
   InspectionImportReviewReason,
@@ -69,6 +70,19 @@ export const inspectionLabelMeta: Record<InspectionLabel, StatusMeta> = {
   red: { label: "Kırmızı", variant: "danger", dot: "bg-danger" },
 };
 
+/**
+ * Checklist groups mirror the report's colour sections (EK 7): the work
+ * order is worked through in the same order as the paper.
+ */
+export const checklistSeverityMeta: Record<
+  ChecklistSeverity,
+  { label: string; dot: string }
+> = {
+  red: { label: "Kırmızı Eksikler", dot: "bg-danger" },
+  yellow: { label: "Sarı Eksikler", dot: "bg-warning" },
+  blue: { label: "Mavi Eksikler", dot: "bg-info" },
+};
+
 export const inspectionTypeMeta: Record<InspectionType, StatusMeta> = {
   periodic: { label: "Periyodik", variant: "outline", dot: "bg-muted-foreground" },
   follow_up: { label: "Takip", variant: "secondary", dot: "bg-muted-foreground" },
@@ -104,6 +118,5 @@ export const workOrderTypeMeta: Record<WorkOrderType, { label: string; icon: str
   maintenance: { label: "Periyodik Bakım", icon: "wrench" },
   fault: { label: "Arıza", icon: "alert-triangle" },
   inspection: { label: "Muayene", icon: "clipboard-check" },
-  modernization: { label: "Modernizasyon", icon: "sparkles" },
-  repair: { label: "Onarım", icon: "hammer" },
+  repair: { label: "Revizyon", icon: "hammer" },
 };

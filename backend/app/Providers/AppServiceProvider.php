@@ -32,13 +32,15 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Global request budget for every /api route: keyed per user when
-     * authenticated, per IP otherwise. Login keeps its own stricter
-     * per-email throttle in AuthController on top of this.
+     * authenticated, per IP otherwise. The web dashboard fans out across
+     * several list endpoints at once, so this budget is intentionally higher
+     * than Laravel's default. Login keeps its own stricter per-email throttle
+     * in AuthController on top of this.
      */
     private function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request): Limit {
-            return Limit::perMinute(60)->by(
+            return Limit::perMinute(240)->by(
                 $request->user()?->id ?? $request->ip()
             );
         });

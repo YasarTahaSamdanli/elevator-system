@@ -25,15 +25,17 @@ class ElevatorInspection extends Model
     use SoftDeletes;
 
     /**
-     * Regulatory remediation windows per label: defects on a red label must
-     * be fixed within 30 days, yellow within 60 (Asansör Periyodik Kontrol
-     * Yönetmeliği). Used to suggest follow_up_due_date when not supplied.
+     * Remediation windows per label as printed on the RoyalCert EK 7 form:
+     * GÜVENSİZ (red) → 60 gün, KUSURLU (yellow) → 120 gün, HAFİF KUSURLU
+     * (blue) → 12 ay. Used to suggest follow_up_due_date when the report
+     * doesn't carry an explicit next-inspection date.
      *
      * @var array<string, int>
      */
     public const FOLLOW_UP_DAYS = [
-        'red' => 30,
-        'yellow' => 60,
+        'red' => 60,
+        'yellow' => 120,
+        'blue' => 365,
     ];
 
     /**

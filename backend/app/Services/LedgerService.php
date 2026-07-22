@@ -15,7 +15,7 @@ class LedgerService
      * Charge the customer for the completed work order's material lines.
      * Line total uses the sale price snapshot; lines without a sale price
      * fall back to the cost snapshot so the charge is never silently lost.
-     * repair/modernization work orders post as revision_charge, everything
+     * repair work orders post as revision_charge, everything
      * else as part_charge (mirrors the customer's Parça/Revizyon split).
      *
      * Runs inside the completion transaction (after the stock issue) and is
@@ -62,7 +62,7 @@ class LedgerService
             'building_id' => $elevator->building_id,
             'elevator_id' => $elevator->id,
             'service_contract_id' => $contract->id,
-            'type' => in_array($workOrder->type, ['repair', 'modernization'], true)
+            'type' => $workOrder->type === 'repair'
                 ? 'revision_charge'
                 : 'part_charge',
             'amount' => number_format($total, 2, '.', ''),

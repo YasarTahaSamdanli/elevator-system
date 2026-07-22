@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import { ClipboardList, Plus } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Toolbar } from "@/components/common/Toolbar";
@@ -117,11 +118,21 @@ const columns: Column<WorkOrder>[] = [
 const statusOptions = metaOptions<WorkOrderStatus>(workOrderStatusMeta);
 const typeOptions = metaOptions<WorkOrderType>(workOrderTypeMeta);
 const priorityOptions = metaOptions<WorkOrderPriority>(workOrderPriorityMeta);
+const workOrderTypes = typeOptions.map((option) => option.value);
+
+function searchTypeParam(value: string | null): WorkOrderType | typeof ALL_VALUE {
+  return value && workOrderTypes.includes(value as WorkOrderType)
+    ? (value as WorkOrderType)
+    : ALL_VALUE;
+}
 
 export function WorkOrdersPage() {
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState(ALL_VALUE);
-  const [type, setType] = React.useState(ALL_VALUE);
+  const [type, setType] = React.useState<WorkOrderType | typeof ALL_VALUE>(() =>
+    searchTypeParam(searchParams.get("type"))
+  );
   const [priority, setPriority] = React.useState(ALL_VALUE);
   const [page, setPage] = React.useState(1);
   const [selected, setSelected] = React.useState<WorkOrder | null>(null);
@@ -133,6 +144,14 @@ export function WorkOrdersPage() {
     setPage(1);
     setSelected(null);
   }, [debouncedQuery, status, type, priority]);
+
+  React.useEffect(() => {
+    setType(searchTypeParam(searchParams.get("type")));
+  }, [searchParams]);
+
+  const setTypeFilter = React.useCallback((value: string) => {
+    setType(searchTypeParam(value));
+  }, []);
 
   const listParams = React.useMemo(
     () => ({
@@ -207,7 +226,7 @@ export function WorkOrdersPage() {
           allLabel="Tüm Durumlar"
           options={statusOptions}
         />
-        <FilterSelect value={type} onChange={setType} allLabel="Tüm Türler" options={typeOptions} />
+        <FilterSelect value={type} onChange={setTypeFilter} allLabel="Tüm Türler" options={typeOptions} />
         <FilterSelect
           value={priority}
           onChange={setPriority}

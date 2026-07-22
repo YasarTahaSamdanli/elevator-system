@@ -54,7 +54,7 @@ class InspectionImportControllerTest extends TestCase
 
         $pdf = UploadedFile::fake()->createWithContent(
             'Fatih Apartmanı Asansör Denetim Raporu.pdf',
-            "%PDF-1.4 Asansör Periyodik Kontrol Raporu\nRapor No: RC-1\nKontrol Tarihi: 01.07.2026\n(P)\nSARI EKSİKLER\n",
+            "%PDF-1.4 Asansör Periyodik Kontrol Raporu\nRapor No: RC-1\nKontrol Tarihi: 01.07.2026\n(P)\nSARI EKSİKLER\n4 - 1.3.1 Makina dairesinde talimat bulunmalıdır.\n",
         );
 
         $response = $this->actingAs($this->user)->post('/api/v1/inspection-imports', ['file' => $pdf]);

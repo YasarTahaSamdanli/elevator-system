@@ -164,13 +164,21 @@ function CommandPalette({
  */
 function NotificationsPopover() {
   const [items, setItems] = React.useState<AppNotification[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const hasLoaded = React.useRef(false);
 
   React.useEffect(() => {
+    if (!open || hasLoaded.current) return;
+
     let cancelled = false;
+    setIsLoading(true);
     fetchOperationalNotifications()
       .then((data) => {
-        if (!cancelled) setItems(data);
+        if (!cancelled) {
+          setItems(data);
+          hasLoaded.current = true;
+        }
       })
       .catch(() => {
         if (!cancelled) setItems([]);
@@ -181,12 +189,12 @@ function NotificationsPopover() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [open]);
 
   const unread = items.filter((n) => !n.read).length;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Bildirimler">
           <Bell className="size-4" />
@@ -304,9 +312,9 @@ export function AppShell() {
   const { user } = useAuth();
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
-  const { items: quickBuildings } = useList(fetchBuildings, quickBuildingParams);
-  const { items: quickElevators } = useList(fetchElevators, quickElevatorParams);
-  const { items: quickWorkOrders } = useList(fetchWorkOrders, quickWorkOrderParams);
+  const { items: quickBuildings } = useList(fetchBuildings, quickBuildingParams, { enabled: paletteOpen });
+  const { items: quickElevators } = useList(fetchElevators, quickElevatorParams, { enabled: paletteOpen });
+  const { items: quickWorkOrders } = useList(fetchWorkOrders, quickWorkOrderParams, { enabled: paletteOpen });
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

@@ -27,12 +27,14 @@ interface UseListState<T> {
  */
 export function useList<T>(
   fetcher: (params: ListParams) => Promise<ListResult<T>>,
-  params: ListParams
+  params: ListParams,
+  options: { enabled?: boolean } = {}
 ): UseListState<T> & { reload: () => void } {
+  const enabled = options.enabled ?? true;
   const [state, setState] = React.useState<UseListState<T>>({
     items: [],
     pagination: null,
-    isLoading: true,
+    isLoading: enabled,
     error: null,
   });
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -41,6 +43,11 @@ export function useList<T>(
   const paramsKey = JSON.stringify(params);
 
   React.useEffect(() => {
+    if (!enabled) {
+      setState((prev) => ({ ...prev, isLoading: false, error: null }));
+      return;
+    }
+
     const id = ++requestId.current;
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -66,7 +73,7 @@ export function useList<T>(
         }));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramsKey, reloadKey, fetcher]);
+  }, [paramsKey, reloadKey, fetcher, enabled]);
 
   const reload = React.useCallback(() => setReloadKey((k) => k + 1), []);
 

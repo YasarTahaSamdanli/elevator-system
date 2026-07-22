@@ -90,6 +90,81 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   };
 }
 
+/**
+ * The four operational lanes the office actually works in (Bakım / Arıza /
+ * Revizyon / Muayene) — mirrors the boss's old dashboard. Revizyon = repair
+ * work orders opened from inspection findings; Muayene = RoyalCert periodic
+ * and follow-up inspections.
+ */
+export interface OperationsSummary {
+  maintenance: { open: number; completedThisMonth: number; scheduledToday: number };
+  fault: { open: number; completedThisMonth: number };
+  revision: { open: number; redLabeled: number; yellowLabeled: number };
+  inspection: { dueThisMonth: number; followUpSoon: number; reportsToReview: number };
+}
+
+export async function fetchOperationsSummary(): Promise<OperationsSummary> {
+  const thisMonth = monthRange(0);
+  const today = daysFromToday(0);
+
+  const openOfType = (type: string) =>
+    fetchWorkOrders({ perPage: 1, filter: { type, status: OPEN_STATUSES } }).then(
+      (r) => r.pagination.total
+    );
+  const completedOfType = (type: string) =>
+    fetchWorkOrders({
+      perPage: 1,
+      filter: { type, status: "completed", completed_at_from: thisMonth.from, completed_at_to: thisMonth.to },
+    }).then((r) => r.pagination.total);
+
+  const [
+    maintenanceOpen,
+    maintenanceCompleted,
+    maintenanceToday,
+    faultOpen,
+    faultCompleted,
+    revisionOpen,
+    redLabeled,
+    yellowLabeled,
+    dueThisMonth,
+    followUpSoon,
+    reportsToReview,
+  ] = await Promise.all([
+    openOfType("maintenance"),
+    completedOfType("maintenance"),
+    fetchWorkOrders({
+      perPage: 1,
+      filter: { type: "maintenance", status: OPEN_STATUSES, scheduled_at_from: today, scheduled_at_to: today },
+    }).then((r) => r.pagination.total),
+    openOfType("fault"),
+    completedOfType("fault"),
+    openOfType("repair"),
+    fetchElevators({ perPage: 1, filter: { current_label: "red" } }).then((r) => r.pagination.total),
+    fetchElevators({ perPage: 1, filter: { current_label: "yellow" } }).then((r) => r.pagination.total),
+    fetchElevators({
+      perPage: 1,
+      filter: { next_inspection_due_from: thisMonth.from, next_inspection_due_to: thisMonth.to },
+    }).then((r) => r.pagination.total),
+    fetchElevators({ perPage: 1, filter: { follow_up_due_to: daysFromToday(15) } }).then(
+      (r) => r.pagination.total
+    ),
+    fetchInspectionImports({ perPage: 1, filter: { status: "needs_review" } }).then(
+      (r) => r.pagination.total
+    ),
+  ]);
+
+  return {
+    maintenance: {
+      open: maintenanceOpen,
+      completedThisMonth: maintenanceCompleted,
+      scheduledToday: maintenanceToday,
+    },
+    fault: { open: faultOpen, completedThisMonth: faultCompleted },
+    revision: { open: revisionOpen, redLabeled, yellowLabeled },
+    inspection: { dueThisMonth, followUpSoon, reportsToReview },
+  };
+}
+
 export interface VolumePoint {
   x: string;
   value: number;

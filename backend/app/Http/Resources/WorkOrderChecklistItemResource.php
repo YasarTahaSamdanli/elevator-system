@@ -18,6 +18,8 @@ class WorkOrderChecklistItemResource extends JsonResource
             'uuid' => $this->uuid,
             'position' => $this->position,
             'label' => $this->label,
+            'severity' => $this->severity,
+            'item_code' => $this->item_code,
             'is_done' => $this->is_done,
             'note' => $this->note,
             'updated_at' => $this->updated_at,

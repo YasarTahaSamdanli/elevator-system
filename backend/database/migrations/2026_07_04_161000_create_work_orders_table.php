@@ -16,7 +16,7 @@ return new class extends Migration
             $table->uuid('uuid')->unique();
             $table->foreignId('service_contract_id')->constrained('service_contracts')->cascadeOnDelete();
             $table->string('work_order_number', 50)->unique();
-            $table->enum('type', ['maintenance', 'fault', 'inspection', 'modernization', 'repair']);
+            $table->enum('type', ['maintenance', 'fault', 'inspection', 'repair']);
             $table->enum('status', ['draft', 'planned', 'assigned', 'in_progress', 'completed', 'cancelled'])->default('draft');
             $table->enum('priority', ['low', 'normal', 'high', 'critical'])->default('normal');
             $table->timestamp('scheduled_at')->nullable();

@@ -358,11 +358,70 @@ class _WorkOrderDetailPageState extends ConsumerState<WorkOrderDetailPage> {
               ],
             ),
             const SizedBox(height: 8),
-            ...workOrder.checklist.map(_checklistTile),
+            ..._groupedChecklist(context, workOrder.checklist),
           ],
         ),
       ),
     );
+  }
+
+  /// Maddeleri rapordaki bölüm sırasıyla (kırmızı → sarı → mavi → diğer)
+  /// gruplayıp her grubun başına renkli başlık koyar. Hiçbir maddede renk
+  /// yoksa (şablon checklist'i) başlıksız düz liste gösterilir.
+  List<Widget> _groupedChecklist(
+    BuildContext context,
+    List<WorkOrderChecklistItem> checklist,
+  ) {
+    final hasSeverity = checklist.any((item) => item.severity != null);
+    if (!hasSeverity) {
+      return checklist.map(_checklistTile).toList();
+    }
+
+    final widgets = <Widget>[];
+
+    for (final severity in [...ChecklistSeverityMeta.order, null]) {
+      final items =
+          checklist.where((item) => item.severity == severity).toList();
+      if (items.isEmpty) {
+        continue;
+      }
+
+      final meta =
+          severity == null ? null : ChecklistSeverityMeta.bySeverity[severity];
+      final done = items.where((item) => item.isDone).length;
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 2),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: meta?.color ?? Colors.grey,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  meta?.title ?? 'Diğer Maddeler',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '$done/${items.length}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+      widgets.addAll(items.map(_checklistTile));
+    }
+
+    return widgets;
   }
 
   Widget _checklistTile(WorkOrderChecklistItem item) {
@@ -396,7 +455,21 @@ class _WorkOrderDetailPageState extends ConsumerState<WorkOrderDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.label),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          if (item.itemCode != null)
+                            TextSpan(
+                              text: '${item.itemCode}  ',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          TextSpan(text: item.label),
+                        ],
+                      ),
+                    ),
                     if (item.note != null && item.note!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),

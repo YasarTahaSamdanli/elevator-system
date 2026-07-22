@@ -25,7 +25,7 @@ class StoreWorkOrderRequest extends FormRequest
                 Rule::exists('service_contracts', 'uuid')
                     ->where('company_id', Auth::user()?->company_id),
             ],
-            'type' => ['required', Rule::in(['maintenance', 'fault', 'inspection', 'modernization', 'repair'])],
+            'type' => ['required', Rule::in(['maintenance', 'fault', 'inspection', 'repair'])],
             'status' => ['sometimes', Rule::in(['draft', 'planned', 'assigned', 'in_progress', 'completed', 'cancelled'])],
             'priority' => ['sometimes', Rule::in(['low', 'normal', 'high', 'critical'])],
             'scheduled_at' => ['nullable', 'date'],

@@ -17,6 +17,10 @@ class InspectionFindingResource extends JsonResource
         return [
             'uuid' => $this->uuid,
             'description' => $this->description,
+            'severity' => $this->severity,
+            'item_code' => $this->item_code,
+            'position' => $this->position,
+            'measurement' => $this->measurement,
             'is_resolved' => $this->is_resolved,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

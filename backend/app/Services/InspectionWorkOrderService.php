@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ElevatorInspection;
+use App\Models\InspectionFinding;
 use App\Models\WorkOrder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -57,10 +58,25 @@ class InspectionWorkOrderService
 
             $position = 1;
 
-            foreach ($inspection->findings()->where('is_resolved', false)->get() as $finding) {
+            // Present the checklist exactly like the paper report: red
+            // section first, then yellow, then blue, each in report order.
+            // Hand-entered findings without a severity go to the end.
+            $findings = $inspection->findings()
+                ->where('is_resolved', false)
+                ->get()
+                ->sortBy(fn (InspectionFinding $finding) => [
+                    InspectionFinding::SEVERITY_ORDER[$finding->severity] ?? count(InspectionFinding::SEVERITY_ORDER),
+                    $finding->position ?? PHP_INT_MAX,
+                    $finding->id,
+                ])
+                ->values();
+
+            foreach ($findings as $finding) {
                 $item = $workOrder->checklistItems()->make([
                     'position' => $position++,
                     'label' => $finding->description,
+                    'severity' => $finding->severity,
+                    'item_code' => $finding->item_code,
                 ]);
                 $item->company_id = $workOrder->company_id;
                 $item->save();

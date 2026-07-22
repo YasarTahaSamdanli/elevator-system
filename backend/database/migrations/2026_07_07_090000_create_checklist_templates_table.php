@@ -16,7 +16,7 @@ return new class extends Migration
             $table->uuid('uuid')->unique();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
             $table->string('name', 150);
-            $table->enum('work_order_type', ['maintenance', 'fault', 'inspection', 'modernization', 'repair']);
+            $table->enum('work_order_type', ['maintenance', 'fault', 'inspection', 'repair']);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();

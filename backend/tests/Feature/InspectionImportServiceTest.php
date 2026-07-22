@@ -56,7 +56,7 @@ class InspectionImportServiceTest extends TestCase
         return app(InspectionImportService::class);
     }
 
-    private function reportText(string $body = "(P)\nKIRMIZI EKSİKLER\n", string $reportNumber = 'RC-2026-0042'): string
+    private function reportText(string $body = "(P)\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n", string $reportNumber = 'RC-2026-0042'): string
     {
         return "ROYALCERT Asansör Periyodik Kontrol Muayene Raporu\n".
             "Rapor No: {$reportNumber}\n".
@@ -92,9 +92,16 @@ class InspectionImportServiceTest extends TestCase
         $this->assertSame('red', $inspection->label);
         $this->assertSame('RC-2026-0042', $inspection->report_number);
         $this->assertSame('2026-07-01', $inspection->inspected_at->toDateString());
-        // Red label: +30 days follow-up window auto-suggested.
-        $this->assertSame('2026-07-31', $inspection->follow_up_due_date->toDateString());
+        // Red label: +60 days follow-up window auto-suggested (EK 7).
+        $this->assertSame('2026-08-30', $inspection->follow_up_due_date->toDateString());
         $this->assertSame($this->company->id, $inspection->company_id);
+
+        // The finding line is stored with its report structure.
+        $finding = $inspection->findings()->withoutGlobalScopes()->first();
+        $this->assertSame('Kat kapı kilit muhafazaları takılmalı.', $finding->description);
+        $this->assertSame('red', $finding->severity);
+        $this->assertSame('2.7.8', $finding->item_code);
+        $this->assertSame(1, $finding->position);
 
         // Elevator label cache refreshed.
         $this->assertSame('red', $this->elevator->fresh()->current_label);
@@ -144,6 +151,41 @@ class InspectionImportServiceTest extends TestCase
         $this->assertSame(1, InspectionImport::withoutGlobalScopes()->count());
     }
 
+    public function test_report_matches_via_elevator_registration_number_when_name_is_unknown(): void
+    {
+        $this->elevator->forceFill(['registration_number' => '146402649-1'])->save();
+
+        $import = $this->service()->process($this->service()->ingestEmail(
+            $this->mail(
+                $this->reportText("(P)\n146402649-1\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n"),
+                subject: 'Bilinmeyen Bina Asansör Denetim Raporu',
+            ),
+            $this->company->id,
+        ));
+
+        $this->assertSame('imported', $import->status);
+        $this->assertSame('registration_number', $import->matched_via);
+        $this->assertSame($this->elevator->id, $import->elevator_id);
+    }
+
+    public function test_matched_elevator_learns_the_reports_registration_number(): void
+    {
+        $this->elevator->forceFill(['registration_number' => null])->save();
+
+        $import = $this->service()->process($this->service()->ingestEmail(
+            $this->mail($this->reportText(
+                "(P)\n146402649-1\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n",
+            )),
+            $this->company->id,
+        ));
+
+        $this->assertSame('imported', $import->status);
+        $this->assertSame('building_name', $import->matched_via);
+        // Backfilled from the report: the next report for this elevator
+        // matches on the registration number even if the name changes.
+        $this->assertSame('146402649-1', $this->elevator->fresh()->registration_number);
+    }
+
     public function test_unmatched_building_lands_in_review_queue_with_pdf_kept(): void
     {
         $import = $this->service()->process($this->service()->ingestEmail(
@@ -178,6 +220,32 @@ class InspectionImportServiceTest extends TestCase
 
         $this->assertSame('needs_review', $import->status);
         $this->assertSame(InspectionImport::REVIEW_PARSE_FAILED, $import->review_reason);
+    }
+
+    public function test_defect_report_without_extractable_findings_needs_review(): void
+    {
+        $import = $this->service()->process($this->service()->ingestEmail(
+            $this->mail($this->reportText("(P)\nKIRMIZI EKSİKLER\n")),
+            $this->company->id,
+        ));
+
+        $this->assertSame('needs_review', $import->status);
+        $this->assertSame(InspectionImport::REVIEW_PARSE_FAILED, $import->review_reason);
+    }
+
+    public function test_declared_finding_count_mismatch_needs_review(): void
+    {
+        $import = $this->service()->process($this->service()->ingestEmail(
+            $this->mail($this->reportText(
+                "(P)\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n".
+                "3 Adet Uygunsuzluk Tespit Edilmiştir.\n",
+            )),
+            $this->company->id,
+        ));
+
+        $this->assertSame('needs_review', $import->status);
+        $this->assertSame(InspectionImport::REVIEW_PARSE_FAILED, $import->review_reason);
+        $this->assertStringContainsString('declares 3 findings', (string) $import->error_message);
     }
 
     public function test_pdf_without_text_layer_needs_review(): void
@@ -222,7 +290,7 @@ class InspectionImportServiceTest extends TestCase
 
         // Same report number arrives again in a byte-different PDF.
         $second = $this->service()->process($this->service()->ingestEmail(
-            $this->mail($this->reportText("(P)\nKIRMIZI EKSİKLER\nEk açıklama\n")),
+            $this->mail($this->reportText("(P)\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı. Ek açıklama\n")),
             $this->company->id,
         ));
 

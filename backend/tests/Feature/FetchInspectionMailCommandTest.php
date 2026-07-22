@@ -80,7 +80,7 @@ class FetchInspectionMailCommandTest extends TestCase
             receivedAt: CarbonImmutable::parse('2026-07-02 09:00'),
             pdfAttachments: [[
                 'filename' => 'rapor.pdf',
-                'contents' => "Asansör Periyodik Kontrol Muayene Raporu\nRapor No: RC-1\nKontrol Tarihi: 01.07.2026\n(P)\nMAVİ EKSİKLER\n",
+                'contents' => "Asansör Periyodik Kontrol Muayene Raporu\nRapor No: RC-1\nKontrol Tarihi: 01.07.2026\n(P)\nMAVİ EKSİKLER\n10 - 1.1.2 Aydınlatma armatürü yeterli şekilde aydınlatılmalıdır.\n",
             ]],
         );
     }

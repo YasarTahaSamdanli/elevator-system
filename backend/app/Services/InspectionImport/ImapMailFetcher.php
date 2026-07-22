@@ -135,9 +135,22 @@ class ImapMailFetcher implements MailFetcherInterface
             $value = $value->first();
         }
 
-        $value = trim((string) $value);
+        $value = trim(self::decodeHeader((string) $value));
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Gmail delivers non-ASCII subjects MIME-encoded ("=?UTF-8?Q?...?=");
+     * decode them so the building-name identity match sees real text.
+     */
+    public static function decodeHeader(string $value): string
+    {
+        if (! str_contains($value, '=?')) {
+            return $value;
+        }
+
+        return mb_decode_mimeheader($value);
     }
 
     private function receivedAt(Message $message): ?CarbonImmutable

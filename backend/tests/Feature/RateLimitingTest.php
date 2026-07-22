@@ -11,11 +11,13 @@ class RateLimitingTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const API_LIMIT_PER_MINUTE = 240;
+
     public function test_api_requests_over_the_limit_return_the_error_contract(): void
     {
         $user = User::factory()->create(['company_id' => Company::factory()->create()->id]);
 
-        for ($i = 0; $i < 60; $i++) {
+        for ($i = 0; $i < self::API_LIMIT_PER_MINUTE; $i++) {
             $this->actingAs($user)->getJson('/api/v1/me')->assertOk();
         }
 
@@ -36,7 +38,7 @@ class RateLimitingTest extends TestCase
         $userA = User::factory()->create(['company_id' => $company->id]);
         $userB = User::factory()->create(['company_id' => $company->id]);
 
-        for ($i = 0; $i < 60; $i++) {
+        for ($i = 0; $i < self::API_LIMIT_PER_MINUTE; $i++) {
             $this->actingAs($userA)->getJson('/api/v1/me')->assertOk();
         }
 

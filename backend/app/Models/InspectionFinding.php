@@ -20,9 +20,24 @@ class InspectionFinding extends Model
     use HasUuids;
     use SoftDeletes;
 
+    /**
+     * Severity display order: mirrors the report's colour sections.
+     *
+     * @var array<string, int>
+     */
+    public const SEVERITY_ORDER = [
+        'red' => 0,
+        'yellow' => 1,
+        'blue' => 2,
+    ];
+
     protected $fillable = [
         'elevator_inspection_id',
         'description',
+        'severity',
+        'item_code',
+        'position',
+        'measurement',
         'is_resolved',
     ];
 

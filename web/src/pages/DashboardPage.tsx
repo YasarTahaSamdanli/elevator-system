@@ -11,8 +11,11 @@ import {
   PackageX,
   Play,
   PlusCircle,
+  Search,
   TrendingDown,
   UserCheck,
+  Wrench,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -44,6 +47,7 @@ import {
   fetchDashboardStats,
   fetchInventoryMovementValue,
   fetchLowStockMaterials,
+  fetchOperationsSummary,
   fetchRecentActivity,
   fetchRecentStockMovements,
   fetchTopConsumedMaterials,
@@ -53,6 +57,7 @@ import {
   type ActivityItem,
   type DashboardStats,
   type InventoryMovementPoint,
+  type OperationsSummary,
   type TopConsumedMaterial,
   type TypeDistributionPoint,
   type VolumePoint,
@@ -91,6 +96,127 @@ function ChartTooltip({
     >
       {label && <div className="mb-0.5 opacity-70">{trShortDay.format(new Date(label))}</div>}
       <div className="font-semibold tabular-nums">{payload[0]?.value} iş emri</div>
+    </div>
+  );
+}
+
+/* ---------- operations lanes (Bakım / Arıza / Revizyon / Muayene) ----------
+ * The office's four working lanes, one card each: a couple of live counts
+ * plus a link to where that work is done. Mirrors the boss's old dashboard.
+ */
+
+function OperationRow({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: number;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "tabular-nums font-medium",
+          emphasize && value > 0 ? "text-danger-foreground" : "text-foreground"
+        )}
+      >
+        {formatNumber(value)}
+      </span>
+    </div>
+  );
+}
+
+function OperationCard({
+  title,
+  icon: Icon,
+  accent,
+  to,
+  cta,
+  footnote,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  accent: string;
+  to: string;
+  cta: string;
+  footnote?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="flex-row items-center gap-2 space-y-0 pb-3">
+        <Icon className={cn("size-4", accent)} />
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-1.5 pt-0">
+        {children}
+        {footnote && <p className="pt-1 text-xs text-muted-foreground/80">{footnote}</p>}
+        <div className="flex-1" />
+        <Button variant="outline" size="sm" className="mt-2 w-full" asChild>
+          <Link to={to}>
+            {cta}
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OperationsCards({ summary }: { summary: OperationsSummary }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <OperationCard
+        title="Bakım"
+        icon={Wrench}
+        accent="text-info"
+        to="/work-orders?type=maintenance"
+        cta="Bakım İş Emirleri"
+      >
+        <OperationRow label="Açık bakım" value={summary.maintenance.open} />
+        <OperationRow label="Bugün planlı" value={summary.maintenance.scheduledToday} />
+        <OperationRow label="Bu ay tamamlanan" value={summary.maintenance.completedThisMonth} />
+      </OperationCard>
+
+      <OperationCard
+        title="Arıza"
+        icon={Zap}
+        accent="text-danger"
+        to="/work-orders?type=fault"
+        cta="Arıza İş Emirleri"
+      >
+        <OperationRow label="Bekleyen arıza" value={summary.fault.open} emphasize />
+        <OperationRow label="Bu ay giderilen" value={summary.fault.completedThisMonth} />
+      </OperationCard>
+
+      <OperationCard
+        title="Revizyon"
+        icon={Wrench}
+        accent="text-warning"
+        to="/work-orders?type=repair"
+        cta="Revizyon İş Emirleri"
+        footnote="Takip sınırı: kırmızı 60 gün · sarı 120 gün"
+      >
+        <OperationRow label="Açık revizyon" value={summary.revision.open} />
+        <OperationRow label="Kırmızı etiketli" value={summary.revision.redLabeled} emphasize />
+        <OperationRow label="Sarı etiketli" value={summary.revision.yellowLabeled} />
+      </OperationCard>
+
+      <OperationCard
+        title="Muayene"
+        icon={Search}
+        accent="text-primary"
+        to="/inspections"
+        cta="Muayene İşlemleri"
+      >
+        <OperationRow label="Bu ay muayenesi gelen" value={summary.inspection.dueThisMonth} />
+        <OperationRow label="Takip süresi yaklaşan" value={summary.inspection.followUpSoon} emphasize />
+        <OperationRow label="İncelenecek rapor" value={summary.inspection.reportsToReview} />
+      </OperationCard>
     </div>
   );
 }
@@ -631,6 +757,7 @@ function RecentStockMovements({ movements }: { movements: StockMovement[] }) {
 
 interface DashboardData {
   stats: DashboardStats;
+  operations: OperationsSummary;
   volume: VolumePoint[];
   inventoryMovement: InventoryMovementPoint[];
   distribution: TypeDistributionPoint[];
@@ -654,6 +781,7 @@ function useDashboardData() {
 
     Promise.all([
       fetchDashboardStats(),
+      fetchOperationsSummary(),
       fetchWorkOrderVolume(),
       fetchInventoryMovementValue(),
       fetchWorkOrderTypeDistribution(),
@@ -665,6 +793,7 @@ function useDashboardData() {
     ])
       .then(([
         stats,
+        operations,
         volume,
         inventoryMovement,
         distribution,
@@ -677,6 +806,7 @@ function useDashboardData() {
         if (cancelled) return;
         setData({
           stats,
+          operations,
           volume,
           inventoryMovement,
           distribution,
@@ -729,6 +859,8 @@ export function DashboardPage() {
         </div>
       ) : (
         <>
+          <OperationsCards summary={data.operations} />
+
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {statsToTiles(data.stats).map((stat) => (
               <StatTile key={stat.key} stat={stat} />

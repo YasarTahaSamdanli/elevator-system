@@ -94,6 +94,14 @@ class InspectionImportService
                 return $import;
             }
 
+            // A defect report with a broken findings list would produce a
+            // hollow work order; park it for a human instead.
+            if (($problem = $report->findingsProblem()) !== null) {
+                $import->markNeedsReview(InspectionImport::REVIEW_PARSE_FAILED, $problem);
+
+                return $import;
+            }
+
             $match = $this->matcher->match($import->company_id, $report);
 
             if (! $match->isMatched()) {
@@ -193,6 +201,13 @@ class InspectionImportService
 
     private function finalize(InspectionImport $import, Elevator $elevator, string $via, ParsedReport $report): void
     {
+        // Learn the report's printed elevator identity number: once it is on
+        // the elevator card, future reports match on it directly, regardless
+        // of how RoyalCert spells the building name.
+        if ($report->registrationNumber !== null && $elevator->registration_number === null) {
+            $elevator->forceFill(['registration_number' => $report->registrationNumber])->save();
+        }
+
         if ($this->isDuplicateReport($import, $elevator, $report)) {
             $import->forceFill(['elevator_id' => $elevator->id, 'matched_via' => $via])->save();
             $import->markNeedsReview(
@@ -220,8 +235,17 @@ class InspectionImportService
             $inspection->company_id = $elevator->company_id;
             $inspection->save();
 
-            foreach ($report->findings as $description) {
-                $finding = $inspection->findings()->make(['description' => $description]);
+            foreach ($report->findings as $reportFinding) {
+                // Older parsed_payload rows stored findings as bare strings.
+                $data = is_array($reportFinding) ? $reportFinding : ['description' => $reportFinding];
+
+                $finding = $inspection->findings()->make([
+                    'description' => $data['description'],
+                    'severity' => $data['severity'] ?? null,
+                    'item_code' => $data['item_code'] ?? null,
+                    'position' => $data['position'] ?? null,
+                    'measurement' => $data['measurement'] ?? null,
+                ]);
                 $finding->company_id = $inspection->company_id;
                 $finding->save();
             }
@@ -305,6 +329,7 @@ class InspectionImportService
             identityNormalized: $payload['identity_normalized'] ?? null,
             registrationNumber: $payload['registration_number'] ?? null,
             findings: $payload['findings'] ?? [],
+            declaredFindingCount: $payload['declared_finding_count'] ?? null,
             warnings: $payload['warnings'] ?? [],
         );
     }

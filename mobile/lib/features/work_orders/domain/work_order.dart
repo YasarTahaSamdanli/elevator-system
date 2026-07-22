@@ -90,12 +90,11 @@ class WorkOrder {
         _ => status,
       };
 
-  String get typeLabel => switch (type) {
+      String get typeLabel => switch (type) {
         'maintenance' => 'Bakım',
         'fault' => 'Arıza',
-        'inspection' => 'Denetim',
-        'modernization' => 'Modernizasyon',
-        'repair' => 'Onarım',
+        'inspection' => 'Muayene',
+        'repair' => 'Revizyon',
         _ => type,
       };
 
@@ -136,6 +135,8 @@ class WorkOrderChecklistItem {
     required this.position,
     required this.label,
     required this.isDone,
+    this.severity,
+    this.itemCode,
     this.note,
   });
 
@@ -145,6 +146,8 @@ class WorkOrderChecklistItem {
         position: json['position'] as int? ?? 0,
         label: json['label'] as String? ?? '',
         isDone: json['is_done'] as bool? ?? false,
+        severity: json['severity'] as String?,
+        itemCode: json['item_code'] as String?,
         note: json['note'] as String?,
       );
 
@@ -152,7 +155,32 @@ class WorkOrderChecklistItem {
   final int position;
   final String label;
   final bool isDone;
+
+  /// Muayene raporundaki renk bölümü (`red`/`yellow`/`blue`); rapor
+  /// kaynaklı olmayan maddelerde null.
+  final String? severity;
+
+  /// Rapordaki standart madde numarası, örn. "2.7.8".
+  final String? itemCode;
+
   final String? note;
+}
+
+/// EK 7 raporundaki renk bölümlerinin başlık ve rengi; checklist kağıttaki
+/// sırayla (kırmızı → sarı → mavi) gruplanarak gösterilir.
+class ChecklistSeverityMeta {
+  const ChecklistSeverityMeta(this.title, this.color);
+
+  final String title;
+  final Color color;
+
+  static const order = ['red', 'yellow', 'blue'];
+
+  static const bySeverity = {
+    'red': ChecklistSeverityMeta('Kırmızı Eksikler', Colors.red),
+    'yellow': ChecklistSeverityMeta('Sarı Eksikler', Colors.amber),
+    'blue': ChecklistSeverityMeta('Mavi Eksikler', Colors.blue),
+  };
 }
 
 class WorkOrderMaterialItem {
