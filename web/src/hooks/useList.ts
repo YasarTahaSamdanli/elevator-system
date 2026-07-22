@@ -39,8 +39,13 @@ export function useList<T>(
   });
   const [reloadKey, setReloadKey] = React.useState(0);
   const requestId = React.useRef(0);
+  const fetcherRef = React.useRef(fetcher);
 
   const paramsKey = JSON.stringify(params);
+
+  React.useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   React.useEffect(() => {
     if (!enabled) {
@@ -51,7 +56,7 @@ export function useList<T>(
     const id = ++requestId.current;
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    fetcher(JSON.parse(paramsKey) as ListParams)
+    fetcherRef.current(JSON.parse(paramsKey) as ListParams)
       .then((result) => {
         if (requestId.current !== id) return;
         setState({
@@ -72,8 +77,7 @@ export function useList<T>(
               : new ApiError("Beklenmeyen bir hata oluştu.", "UNKNOWN_ERROR", 0),
         }));
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramsKey, reloadKey, fetcher, enabled]);
+  }, [paramsKey, reloadKey, enabled]);
 
   const reload = React.useCallback(() => setReloadKey((k) => k + 1), []);
 

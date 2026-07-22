@@ -8,6 +8,7 @@
 const API_BASE: string = import.meta.env.VITE_API_URL ?? "/api/v1";
 const TOKEN_KEY = "asansor-token";
 let memoryToken: string | null = null;
+const inFlightGetRequests = new Map<string, Promise<Envelope<unknown>>>();
 
 export interface PaginationMeta {
   page: number;
@@ -94,7 +95,7 @@ export function listQueryString(params: ListParams): string {
   return s ? `?${s}` : "";
 }
 
-export async function api<T>(
+async function apiRaw<T>(
   path: string,
   options: { method?: string; body?: unknown } = {}
 ): Promise<Envelope<T>> {
@@ -152,6 +153,29 @@ export async function api<T>(
   }
 
   return { data: body.data as T, message: body.message ?? "", meta: body.meta };
+}
+
+export async function api<T>(
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<Envelope<T>> {
+  const method = options.method ?? "GET";
+  const token = getToken();
+  const requestKey = method === "GET" && options.body === undefined ? `${token ?? ""}:${path}` : null;
+
+  if (requestKey) {
+    const existing = inFlightGetRequests.get(requestKey);
+    if (existing) return existing as Promise<Envelope<T>>;
+  }
+
+  const request = apiRaw<T>(path, options);
+
+  if (requestKey) {
+    inFlightGetRequests.set(requestKey, request as Promise<Envelope<unknown>>);
+    request.finally(() => inFlightGetRequests.delete(requestKey));
+  }
+
+  return request;
 }
 
 /** Fetch a binary endpoint (e.g. a stored report PDF) with the auth header. */

@@ -130,7 +130,7 @@ interface ChecklistItemPayload {
   note: string | null;
 }
 
-interface WorkOrderPayload {
+export interface WorkOrderPayload {
   uuid: string;
   work_order_number: string;
   service_contract: { uuid: string | null; contract_number: string | null };
@@ -162,7 +162,7 @@ interface UserPayload {
   roles: string[];
 }
 
-interface MaterialPayload {
+export interface MaterialPayload {
   uuid: string;
   code: string;
   name: string;
@@ -184,7 +184,7 @@ interface WarehousePayload {
   is_active: boolean;
 }
 
-interface StockMovementPayload {
+export interface StockMovementPayload {
   uuid: string;
   material: { uuid: string | null; code: string | null; name: string | null; unit: MaterialUnit | null };
   warehouse: { uuid: string | null; name: string | null; type: Warehouse["type"] | null };
@@ -316,7 +316,7 @@ function mapContract(p: ContractPayload): ServiceContract {
   };
 }
 
-function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
+export function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
   return {
     id: p.uuid,
     service_contract_id: p.service_contract.uuid ?? "",
@@ -349,7 +349,7 @@ function mapWorkOrder(p: WorkOrderPayload): WorkOrder {
   };
 }
 
-function mapMaterial(p: MaterialPayload): Material {
+export function mapMaterial(p: MaterialPayload): Material {
   return {
     id: p.uuid,
     code: p.code,
@@ -375,7 +375,7 @@ function mapWarehouse(p: WarehousePayload): Warehouse {
   };
 }
 
-function mapStockMovement(p: StockMovementPayload): StockMovement {
+export function mapStockMovement(p: StockMovementPayload): StockMovement {
   return {
     id: p.uuid,
     material: {

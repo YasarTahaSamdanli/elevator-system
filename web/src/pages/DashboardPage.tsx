@@ -44,17 +44,9 @@ import { workOrderPriorityMeta, workOrderStatusMeta } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import {
-  fetchDashboardStats,
-  fetchInventoryMovementValue,
-  fetchLowStockMaterials,
-  fetchOperationsSummary,
-  fetchRecentActivity,
-  fetchRecentStockMovements,
-  fetchTopConsumedMaterials,
-  fetchTopOpenWorkOrders,
-  fetchWorkOrderTypeDistribution,
-  fetchWorkOrderVolume,
   type ActivityItem,
+  fetchDashboardData,
+  type DashboardData,
   type DashboardStats,
   type InventoryMovementPoint,
   type OperationsSummary,
@@ -755,19 +747,6 @@ function RecentStockMovements({ movements }: { movements: StockMovement[] }) {
 
 /* ---------- page ---------- */
 
-interface DashboardData {
-  stats: DashboardStats;
-  operations: OperationsSummary;
-  volume: VolumePoint[];
-  inventoryMovement: InventoryMovementPoint[];
-  distribution: TypeDistributionPoint[];
-  openWorkOrders: WorkOrder[];
-  activity: ActivityItem[];
-  lowStockMaterials: Material[];
-  topConsumedMaterials: TopConsumedMaterial[];
-  recentStockMovements: StockMovement[];
-}
-
 function useDashboardData() {
   const [data, setData] = React.useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -779,43 +758,10 @@ function useDashboardData() {
     setIsLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchDashboardStats(),
-      fetchOperationsSummary(),
-      fetchWorkOrderVolume(),
-      fetchInventoryMovementValue(),
-      fetchWorkOrderTypeDistribution(),
-      fetchTopOpenWorkOrders(),
-      fetchRecentActivity(),
-      fetchLowStockMaterials(),
-      fetchTopConsumedMaterials(),
-      fetchRecentStockMovements(),
-    ])
-      .then(([
-        stats,
-        operations,
-        volume,
-        inventoryMovement,
-        distribution,
-        openWorkOrders,
-        activity,
-        lowStockMaterials,
-        topConsumedMaterials,
-        recentStockMovements,
-      ]) => {
+    fetchDashboardData()
+      .then((dashboard) => {
         if (cancelled) return;
-        setData({
-          stats,
-          operations,
-          volume,
-          inventoryMovement,
-          distribution,
-          openWorkOrders,
-          activity,
-          lowStockMaterials,
-          topConsumedMaterials,
-          recentStockMovements,
-        });
+        setData(dashboard);
       })
       .catch((err: unknown) => {
         if (cancelled) return;

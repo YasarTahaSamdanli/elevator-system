@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AccountTransactionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BuildingController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ElevatorController;
 use App\Http\Controllers\Api\V1\ElevatorInspectionController;
 use App\Http\Controllers\Api\V1\InspectionFindingController;
@@ -25,6 +26,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::get('dashboard', DashboardController::class);
 
         Route::apiResource('buildings', BuildingController::class);
         Route::apiResource('elevators', ElevatorController::class);

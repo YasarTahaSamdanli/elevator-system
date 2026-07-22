@@ -5,7 +5,21 @@
  * narrow (perPage=1) requests instead of fetching everything and counting
  * client-side; charts fetch the underlying rows and group them in-browser.
  */
-import { fetchContracts, fetchElevators, fetchInspectionImports, fetchMaterials, fetchStockMovements, fetchWorkOrders } from "@/api/resources";
+import {
+  fetchContracts,
+  fetchElevators,
+  fetchInspectionImports,
+  fetchMaterials,
+  fetchStockMovements,
+  fetchWorkOrders,
+  mapMaterial,
+  mapStockMovement,
+  mapWorkOrder,
+  type MaterialPayload,
+  type StockMovementPayload,
+  type WorkOrderPayload,
+} from "@/api/resources";
+import { api } from "@/lib/api";
 import { workOrderTypeOrder } from "@/lib/chartColors";
 import { formatDate } from "@/lib/format";
 import { inspectionImportReviewReasonLabel, workOrderTypeMeta } from "@/lib/status";
@@ -38,6 +52,62 @@ export interface DashboardStats {
   lowStockMaterials: number;
   monthlyConsumptionValue: number;
   stockMovementCount: number;
+}
+
+interface DashboardPayload {
+  stats: DashboardStats;
+  operations: OperationsSummary;
+  volume: VolumePoint[];
+  inventoryMovement: InventoryMovementPoint[];
+  distribution: TypeDistributionPoint[];
+  openWorkOrders: WorkOrderPayload[];
+  activity: ActivityItem[];
+  lowStockMaterials: MaterialPayload[];
+  topConsumedMaterials: Array<{
+    material: StockMovementPayload["material"];
+    quantity: number | string;
+    value: number | string;
+  }>;
+  recentStockMovements: StockMovementPayload[];
+}
+
+export interface DashboardData {
+  stats: DashboardStats;
+  operations: OperationsSummary;
+  volume: VolumePoint[];
+  inventoryMovement: InventoryMovementPoint[];
+  distribution: TypeDistributionPoint[];
+  openWorkOrders: WorkOrder[];
+  activity: ActivityItem[];
+  lowStockMaterials: Material[];
+  topConsumedMaterials: TopConsumedMaterial[];
+  recentStockMovements: StockMovement[];
+}
+
+export async function fetchDashboardData(): Promise<DashboardData> {
+  const { data } = await api<DashboardPayload>("/dashboard");
+
+  return {
+    stats: data.stats,
+    operations: data.operations,
+    volume: data.volume,
+    inventoryMovement: data.inventoryMovement,
+    distribution: data.distribution,
+    openWorkOrders: data.openWorkOrders.map(mapWorkOrder),
+    activity: data.activity,
+    lowStockMaterials: data.lowStockMaterials.map(mapMaterial),
+    topConsumedMaterials: data.topConsumedMaterials.map((item) => ({
+      material: {
+        id: item.material.uuid ?? "",
+        code: item.material.code ?? "",
+        name: item.material.name ?? "â€”",
+        unit: item.material.unit ?? "piece",
+      },
+      quantity: Number(item.quantity),
+      value: Number(item.value),
+    })),
+    recentStockMovements: data.recentStockMovements.map(mapStockMovement),
+  };
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
