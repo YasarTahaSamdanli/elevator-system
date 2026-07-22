@@ -59,6 +59,11 @@ class ImapMailFetcher implements MailFetcherInterface
                 continue;
             }
 
+            // Gmail can still add \Seen while attachment bodies are loaded,
+            // despite FT_PEEK/leaveUnread. Keep the poll idempotent: only
+            // mark/move after the import command confirms persistence.
+            $message->unsetFlag('Seen');
+
             $uid = (string) $message->getUid();
             $this->openMessages[$uid] = $message;
 
