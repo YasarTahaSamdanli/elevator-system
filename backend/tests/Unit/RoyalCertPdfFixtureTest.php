@@ -10,7 +10,8 @@ use PHPUnit\Framework\TestCase;
  * Runs the real PDF extractor + parser against an actual RoyalCert EK 7
  * report (text-based conversion of the ÖRNEK EVLER 3 GÜVENSİZ report).
  * The PDF covers the report's first two pages only, so it deliberately
- * declares 61 findings while containing 28 — exercising the count guard.
+ * declares 61 findings while containing 28. The mismatch stays visible as
+ * a parser warning, but the available findings are still actionable.
  */
 class RoyalCertPdfFixtureTest extends TestCase
 {
@@ -68,11 +69,15 @@ class RoyalCertPdfFixtureTest extends TestCase
         $this->assertSame('Kabin üstü paten boşlukları ayarlanmalıdır.', $last['description']);
     }
 
-    public function test_partial_report_trips_the_declared_count_guard(): void
+    public function test_partial_report_keeps_declared_count_mismatch_as_warning(): void
     {
         $report = $this->parseFixture();
 
         $this->assertSame(61, $report->declaredFindingCount);
-        $this->assertNotNull($report->findingsProblem());
+        $this->assertNull($report->findingsProblem());
+        $this->assertContains(
+            'Report declares 61 findings but 28 were extracted.',
+            $report->warnings,
+        );
     }
 }

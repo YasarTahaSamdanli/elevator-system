@@ -233,8 +233,10 @@ class InspectionImportServiceTest extends TestCase
         $this->assertSame(InspectionImport::REVIEW_PARSE_FAILED, $import->review_reason);
     }
 
-    public function test_declared_finding_count_mismatch_needs_review(): void
+    public function test_declared_finding_count_mismatch_imports_with_warning_when_findings_exist(): void
     {
+        ServiceContract::factory()->create(['elevator_id' => $this->elevator->id, 'status' => 'active']);
+
         $import = $this->service()->process($this->service()->ingestEmail(
             $this->mail($this->reportText(
                 "(P)\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n".
@@ -243,9 +245,19 @@ class InspectionImportServiceTest extends TestCase
             $this->company->id,
         ));
 
-        $this->assertSame('needs_review', $import->status);
-        $this->assertSame(InspectionImport::REVIEW_PARSE_FAILED, $import->review_reason);
-        $this->assertStringContainsString('declares 3 findings', (string) $import->error_message);
+        $this->assertSame('imported', $import->status);
+        $this->assertNull($import->review_reason);
+        $this->assertContains(
+            'Report declares 3 findings but 1 were extracted.',
+            $import->parsed_payload['warnings'],
+        );
+
+        $inspection = $import->inspection()->withoutGlobalScopes()->first();
+        $this->assertSame(1, $inspection->findings()->withoutGlobalScopes()->count());
+        $this->assertSame(
+            1,
+            $inspection->workOrder()->withoutGlobalScopes()->first()->checklistItems()->withoutGlobalScopes()->count(),
+        );
     }
 
     public function test_pdf_without_text_layer_needs_review(): void

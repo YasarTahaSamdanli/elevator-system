@@ -204,13 +204,19 @@ class RoyalCertReportParserTest extends TestCase
         $this->assertNotNull($report->findingsProblem());
     }
 
-    public function test_declared_count_mismatch_reports_a_problem(): void
+    public function test_declared_count_mismatch_is_kept_as_warning(): void
     {
         $text = $this->reportText(
             "(P)\nKIRMIZI EKSİKLER\n1 - 2.7.8 Kat kapı kilit muhafazaları takılmalı.\n".
             "5 Adet Uygunsuzluk Tespit Edilmiştir.\n",
         );
 
-        $this->assertNotNull($this->parser->parse($text, 'Test Apt')->findingsProblem());
+        $report = $this->parser->parse($text, 'Test Apt');
+
+        $this->assertNull($report->findingsProblem());
+        $this->assertContains(
+            'Report declares 5 findings but 1 were extracted.',
+            $report->warnings,
+        );
     }
 }

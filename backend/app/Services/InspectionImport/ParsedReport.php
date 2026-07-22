@@ -41,22 +41,16 @@ final class ParsedReport
     }
 
     /**
-     * A defect report whose findings list doesn't hold up must be reviewed
-     * by a human instead of silently producing a hollow work order. Returns
-     * the reason, or null when the findings are trustworthy.
+     * A defect report with no extractable findings must be reviewed by a
+     * human instead of silently producing a hollow work order. Declared
+     * count mismatches are kept as parser warnings: partial RoyalCert PDFs
+     * can declare the full report total while only carrying the visible
+     * finding pages we received.
      */
     public function findingsProblem(): ?string
     {
         if ($this->label !== null && $this->label !== 'green' && $this->findings === []) {
             return sprintf('Report label is %s but no findings could be extracted.', $this->label);
-        }
-
-        if ($this->declaredFindingCount !== null && $this->declaredFindingCount !== count($this->findings)) {
-            return sprintf(
-                'Report declares %d findings but %d were extracted.',
-                $this->declaredFindingCount,
-                count($this->findings),
-            );
         }
 
         return null;
